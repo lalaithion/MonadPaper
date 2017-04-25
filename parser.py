@@ -74,12 +74,15 @@ class Result:
 PARSER
 '''
 
+import inspect
+
 class Parser:
     def __init__(self, function):
         self._function = function
         
     def __call__(self, text):
-        return self._function(text)
+        x = self._function(text)
+        return x
 
     def __repr__(self):
         return '<Parsing Combinator>'
@@ -87,13 +90,9 @@ class Parser:
     def bind(self, function):
         
         def bind_func(result):
-            res = function(result[0])
-            if res.is_ok():
-                return Result.ok((res.unwrap(), result[1]))
-            else:
-                return res
+            return function(result[0]).bind(lambda x: Result.ok((x, result[1])))
 
-        return Parser(lambda text: function())
+        return Parser(lambda text: self(text).bind(bind_func))
     
     def fmap(self, function):
         return self.bind(lambda x: Result.ok(function(x)))
@@ -111,7 +110,7 @@ class Parser:
             
         return Parser(lambda text: self(text).bind(lambda res: combine_func(*res)))
     
-    def compose(self, other):
+    def concat(self, other):
         return self.combine(other, lambda x, y: x + y)
     
     def choice(self,other):
@@ -171,7 +170,7 @@ class Parser:
         return self.first(other)
         
     def __add__(self, other):
-        return self.compose(other)
+        return self.concat(other)
         
     def __or__(self, other):
         return self.choice(other)
@@ -195,7 +194,7 @@ class Parser:
                 return Result.error('Failed to match character {} at {}'
                     .format(repr(val), repr(text)))
 
-        return cls(match_char)
+        return Parser(match_char)
 
     @classmethod
     def empty(cls):
@@ -203,7 +202,7 @@ class Parser:
         def match_empty(text):
             return Result.ok(('', text))
 
-        return cls(match_empty)
+        return Parser(match_empty)
 
     @classmethod
     def oneof(cls, charls):
@@ -221,7 +220,7 @@ class Parser:
                 return Result.error('Failed to match one of {} at {}'
                     .format(list(charls), repr(text)))
 
-        return cls(match_charls)
+        return Parser(match_charls)
 
     @classmethod
     def noneof(cls, charls):
@@ -239,7 +238,7 @@ class Parser:
                 return Result.error('Found one of {} at {} when there should be none of'
                     .format(list(charls), repr(text)))
 
-        return cls(none_charls)
+        return Parser(none_charls)
 
     def parse_prefix(self, string):
         return self(string)
@@ -298,14 +297,14 @@ digits = Parser.oneof('0123456789').many1()
 decimal = (Parser.char('.') + digits).optional()
 sign = (Parser.char('+') | Parser.char('-')).optional()
 exponent = ((Parser.char('e') | Parser.char('E')) + sign + digits).optional()
-number = sign + digits + decimal + exponent
+number = (sign + digits + decimal + exponent) >> result_float
 
-#print(Parser.parse_total(number, '-12'))
-#print(Parser.parse_total(number, '12e10'))
-#print(Parser.parse_total(number, '2.12345e+100'))
-#print(Parser.parse_total(number, 'hello world'))
-#print(Parser.parse_total(number, '99 bottles of beer on the wall'))
-#print(Parser.parse_total(number, ''))
+print(Parser.parse_total(number, '-12'))
+print(Parser.parse_total(number, '12e10'))
+print(Parser.parse_total(number, '2.12345e+100'))
+print(Parser.parse_total(number, 'hello world'))
+print(Parser.parse_total(number, '99 bottles of beer on the wall'))
+print(Parser.parse_total(number, ''))
 
 def result_float(x):
     try:
@@ -315,65 +314,79 @@ def result_float(x):
 
 whitespace = Parser.oneof(' \n').many1()
 many_numbers = (
-        number
-        .combine(
-            whitespace.optional(),
-            lambda x,y: x
-        )
-        >> (result_float)
-        > (lambda x: [x])
+        (whitespace.optional() >= number) > (lambda x: [x])
     ).many()
 
 text = '2.12345e+100 2.1e10 1223 13.5 100e100'
-#print(Parser.parse_total(many_numbers, text))
+print(Parser.parse_total(many_numbers, text))
 # Ok(([2.12345e+100, 21000000000.0, 1223.0, 13.5, 1e+102], ''))
 
 expression = Parser.noneof(',\n').many1()
 comma = Parser.char(',')
 newline = Parser.char('\n')
-line = expression.combine(comma, lambda x, y: [x]).many()
-csv = line.combine(newline, lambda x, y: [x]).many()
+line = ((expression <= comma.optional()) > (lambda x: [x])).many()
+csv = ((line <= newline) > (lambda x: [x])).many()
 
-text = '''1,2,3,4,5,
-hello world, my, good, friends, 5,
-0,1,2,3,4,
+text = '''1,2,3,4,5
+hello world, my, good, friends, 5
+0,1,2,3,4
 '''
+print(Parser.parse_total(csv, text))
 
-#print(Parser.parse_total(csv, text))
-
-import collections
+from collections import namedtuple
 from enum import Enum, auto
 
 class Op(Enum):
     PLUS = auto()
     MINUS = auto()
+    TIMES = auto()
+    DIV = auto()
 
 Expr = collections.namedtuple('Expr', ['Op','e1','e2'])
 
 openp = Parser.char('(') + whitespace.optional()
-closep = Parser.char(')') + whitespace.optional()
+closep = whitespace.optional() + Parser.char(')')
 plus = whitespace.optional() + Parser.char('+') + whitespace.optional()
 minus = whitespace.optional() + Parser.char('-') + whitespace.optional()
+times = whitespace.optional() + Parser.char('*') + whitespace.optional()
+div = whitespace.optional() + Parser.char('/') + whitespace.optional()
 
 Plus = lambda x: Expr(Op.PLUS, x[0], x[1])
-Minus = lambda x: Expr(Op.PLUS, x[0], x[1])
+Minus = lambda x: Expr(Op.MINUS, x[0], x[1])
+Times = lambda x: Expr(Op.TIMES, x[0], x[1])
+Div = lambda x: Expr(Op.DIV, x[0], x[1])
 
 def expr(text):
-    recursive = ((openp >= Parser(expr)) & (plus >= Parser(expr))) <= closep
-    num = (number >> result_float)
-    full = ((recursive > Plus) | num)
+    recursive_plus = ((openp >= Parser(expr)) & (plus >= Parser(expr))) <= closep
+    recursive_minus = ((openp >= Parser(expr)) & (minus >= Parser(expr))) <= closep
+    recursive_times = ((openp >= Parser(expr)) & (times >= Parser(expr))) <= closep
+    recursive_div = ((openp >= Parser(expr)) & (div >= Parser(expr))) <= closep
+    
+    full = (
+                (recursive_plus > Plus)
+                | (recursive_minus > Minus)
+                | (recursive_times > Times)
+                | (recursive_div > Div)
+                | number
+           )
+
     return full(text)
 
-text = '((1+2) + (9 + 11))'
+text = '((1+2) * (9 - 11))'
 
 print(Parser(expr).parse_total(text))
 # Ok(
-#    Expr(Op=<Op.PLUS: 1>,
-#         e1=Expr(Op=<Op.PLUS: 1>,
-#            e1=1.0,
-#            e2=2.0),
-#         e2=Expr(Op=<Op.PLUS: 1>,
-#            e1=9.0,
-#            e2=11.0)
-#        )
-#    )
+#     Expr(
+#         Op=<Op.TIMES: 3>,
+#         e1=Expr(
+#             Op=<Op.PLUS: 1>,
+#             e1=1.0,
+#             e2=2.0
+#         ),
+#         e2=Expr(
+#             Op=<Op.MINUS: 2>,
+#             e1=9.0,
+#             e2=11.0
+#         )
+#     )
+# )
