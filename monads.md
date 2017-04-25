@@ -1,12 +1,6 @@
 ---
 title: Monads Explained
 author: Izaak Weiss
-header-includes:
-    - \usepackage{amsmath}
-    - \usepackage{physics}
-    - \newcommand{\eq}[1]{\begin{align*}#1\end{align*}}
-    - \newcommand{\mx}[1]{\begin{bmatrix}#1\end{bmatrix}}
-    - \newcommand{\paren}[1]{\left(#1\right)}
 ---
 
 # What are Monads?
@@ -564,8 +558,8 @@ I'm going to slightly deviate from our already established order to introduce th
             try:
                 current = text[0]
             except IndexError:
-                return Result.error('End of String encountered, but ' +
-                    '{} is still expected'.format(repr(val)))
+                return Result.error('End of String encountered, but '
+                    + '{} is still expected'.format(repr(val)))
             
             if current == val:
                 return Result.ok((text[0], text[1:]))
@@ -590,8 +584,8 @@ I'm going to slightly deviate from our already established order to introduce th
             try:
                 current = text[0]
             except IndexError:
-                return Result.error('End of String encountered, but one of ' +
-                    '{} is still expected'.format(list(charls)))
+                return Result.error('End of String encountered, but one of '
+                    + '{} is still expected'.format(list(charls)))
 
             if current in charls:
                 return Result.ok((text[0], text[1:]))
@@ -608,14 +602,14 @@ I'm going to slightly deviate from our already established order to introduce th
             try:
                 current = text[0]
             except IndexError:
-                return Result.error('End of String encountered, but none of ' +
-                    '{} is still expected'.format(repr(text)))
+                return Result.error('End of String encountered, but none of '
+                    + '{} is still expected'.format(repr(text)))
 
             if current not in charls:
                 return Result.ok((text[0], text[1:]))
             else:
-                return Result.error('Found one of {} at {} when' +
-                    'there should be none of'.format(list(charls), repr(text)))
+                return Result.error('Found one of {} at {} when'
+                    + 'there should be none of'.format(list(charls), repr(text)))
 
         return Parser(none_charls)
 ```
@@ -725,15 +719,23 @@ Finally, `optional` tries to match the input text with `self`, but if it fails, 
 Finally, we add symbolic versions of many of the above functions. This is purely for ease of reading the expressions we will write; you will see that they can get pretty complex, and we don't want to
 
 ```python
+    # |
     def __or__(self, other):
         return self.choice(other)
 
+    # +
     def __add__(self, other):
-        return self.compose(other)
+        return self.concat(other)
 
+    # =>
     def __ge__(self, other):
         return self.last(other)
+    
+    # <=
+    def __le__(self, other):
+        return self.first(other)
 
+    # &
     def __and__(self, other):
         return self.tuple(other)
 ```
@@ -767,9 +769,11 @@ This lets us bind functions that affect the result we get at the end of our pars
 We're also going to introduce a new function very similar to `bind` called `fmap`. This function is the same as `bind`, but it takes a function that can't fail and uses that to modify the matched value. We could always write out `bind(lambda x: Result.ok(function(x)))` for this, but it's nice to have it packaged up in a method, because then we can bind it to a symbol.
 
 ```python
+    # >>
     def __rshift__(self, function):
         return self.bind(function)
     
+    # >
     def __gt__(self, function):
         return self.fmap(function)
 ```
@@ -786,8 +790,8 @@ Finally, let's write some functions that actually call the parser on some string
             if tup[1] == '':
                 return Result.ok(tup[0])
             else:
-                return Result.error('The match did not consist of the entire ' +
-                    'string: {} was left over'.format(repr(tup[1])))
+                return Result.error('The match did not consist of the entire '
+                    + 'string: {} was left over'.format(repr(tup[1])))
             
         return self(string) >> check_full
 ```
@@ -930,7 +934,7 @@ class Op(Enum):
     TIMES = auto()
     DIV = auto()
 
-Expr = collections.namedtuple('Expr', ['Op','e1','e2'])
+Expr = namedtuple('Expr', ['Op','e1','e2'])
 
 openp = Parser.char('(') + whitespace.optional()
 closep = whitespace.optional() + Parser.char(')')
@@ -945,16 +949,17 @@ Times = lambda x: Expr(Op.TIMES, x[0], x[1])
 Div = lambda x: Expr(Op.DIV, x[0], x[1])
 
 def expr(text):
-    recursive_plus = ((openp >= Parser(expr)) & (plus >= Parser(expr))) <= closep
-    recursive_minus = ((openp >= Parser(expr)) & (minus >= Parser(expr))) <= closep
-    recursive_times = ((openp >= Parser(expr)) & (times >= Parser(expr))) <= closep
-    recursive_div = ((openp >= Parser(expr)) & (div >= Parser(expr))) <= closep
+    # rec stands for recursive
+    rec_plus = ((openp >= Parser(expr)) & (plus >= Parser(expr))) <= closep
+    rec_minus = ((openp >= Parser(expr)) & (minus >= Parser(expr))) <= closep
+    rec_times = ((openp >= Parser(expr)) & (times >= Parser(expr))) <= closep
+    rec_div = ((openp >= Parser(expr)) & (div >= Parser(expr))) <= closep
     
     full = (
-                (recursive_plus > Plus)
-                | (recursive_minus > Minus)
-                | (recursive_times > Times)
-                | (recursive_div > Div)
+                (rec_plus > Plus)
+                | (rec_minus > Minus)
+                | (rec_times > Times)
+                | (rec_div > Div)
                 | number
            )
 
@@ -982,7 +987,7 @@ print(Parser(expr).parse_total(text))
 
 # Theory Time
 
-HAVING A HARD TIME
+
 
 # The Zeroth Monad
 

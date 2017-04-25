@@ -235,8 +235,8 @@ class Parser:
             if current not in charls:
                 return Result.ok((text[0], text[1:]))
             else:
-                return Result.error('Found one of {} at {} when there should be none of'
-                    .format(list(charls), repr(text)))
+                return Result.error('Found one of {} at {} '
+                    +'when there should be none of'.format(list(charls), repr(text)))
 
         return Parser(none_charls)
 
@@ -327,7 +327,7 @@ newline = Parser.char('\n')
 line = ((expression <= comma.optional()) > (lambda x: [x])).many()
 csv = ((line <= newline) > (lambda x: [x])).many()
 
-text = '''1,2,3,4,5
+text = '''1,2,3,8,5
 hello world, my, good, friends, 5
 0,1,2,3,4
 '''
@@ -342,7 +342,7 @@ class Op(Enum):
     TIMES = auto()
     DIV = auto()
 
-Expr = collections.namedtuple('Expr', ['Op','e1','e2'])
+Expr = namedtuple('Expr', ['Op','e1','e2'])
 
 openp = Parser.char('(') + whitespace.optional()
 closep = whitespace.optional() + Parser.char(')')
