@@ -987,7 +987,172 @@ print(Parser(expr).parse_total(text))
 
 # Theory Time
 
+Now that we've seen many types of Monads, we should discuss the technical, boring discussion of what a Monad is. A Monad is, in essence, any construct, usually an object, in a language that satisfies the following criteria. I will say each criterion in two ways; a simple way, and a correct way.
 
+However, there are two ways to define Monads. The two definitions in practice lead to the exact same object, but some Monads are easier to deal with using one definition, and other Monads are easier to deal with using the other. I will start with the Monad laws that are easiest for the Option Monad.
+
+## The Monad Laws with `bind`
+
+ * For any type `t`, and Monad type `M`, `M t` is the type of the Monad holding that type.
+ * _Monads can hold values_
+
+&nbsp;
+
+ * There is a function called 'unit' or 'return' that has type `t -> M t` which injects a value of type `t` into a Monad of type `M t` in some simple way.
+ * _There is a function to create Monads from regular values_
+
+&nbsp;
+
+ * There is a binding operation of type `M t -> (t -> M u) -> M u` which maps the value of a Monad of type `M t` into another Monad of type `M u` by using a function that maps a value of type `t` into a Monad of type `M u`
+ * _There is a bind function, as discussed earlier_
+
+&nbsp;
+
+These above laws also have to follow a set of rules that determines how the above functions can be combined. These rules are super simple; basically they just exist to make sure that the bind function and the constructor don't do anything funky.
+
+&nbsp;
+
+ * The unit function acts as a neutral element of bind
+ * _Calling bind on the unit function (or constructor) doesn't do anything_
+
+Example:
+
+```python
+            Option.some(5).bind(Option.some) == Option.some(5)
+```
+
+&nbsp;
+
+ * Binding two functions in series is the same as binding the result of composing those two functions
+ * _You don't have to worry about binding doing weird things to your values; an example is really useful here_
+
+```python
+            def one_over(x):
+                if x == 0:
+                     return Option.none()
+                return Option.some(1/x)
+
+            def two_over(x):
+                if x == 0:
+                    return Option.none()
+                return Option.some(2/x)
+
+            Option.some(5).bind(one_over).bind(two_over) == Option.some(5) \
+                .bind(lambda x: one_over(x).bind(two_over))
+```
+
+## `fmap` and `join`
+
+If you want, you can replace the bind function with two slightly different functions, and you get the same exact system. These two functions are called `fmap` and `join`. Below, I'll implement them for the Option Monad.
+
+```python
+    def fmap(self, function):
+        if self.is_none():
+            return self
+        val = self.unwrap()
+        return Option.some(function(val))
+
+    def join(self):
+        if self.is_none():
+            return self
+        val = self.unwrap()
+        return val
+```
+
+`fmap` is the simpler of the two. `fmap` applies a function to the Option's value, if it has one. The difference between `fmap` and `bind` is that `fmap` assumes that it's function will always succeed, and therefore doesn't need to return an Option Monad. We have already seen `fmap`, with the Parsing Combinator, but we haven't really given it it's full introduction until now.
+
+```python
+def plus_one(x):
+    return x + 1
+
+Option.some(5).fmap(plus_one)
+```
+
+In the above example, we can't use `bind`, because `plus_one` doesn't return an Option Monad, so it would break our chain of `bind` commands. However, `fmap` can be used instead. But `fmap` can't be a replacement for `bind` all on it's own.
+
+```python
+def one_over(x):
+    if x == 0:
+         return Option.none()
+    return Option.some(1/x)
+
+Option.some(5).fmap(one_over) == Option.some(Option.some(0.2))
+Option.some(0).fmap(one_over) == Option.some(Option.none())
+```
+
+In the above example, `fmap` adds an additional layer of the Option Monad. This is where `join` comes in. `join` collapses two layers of a Monad into one layer.
+
+```python
+Option.some(5).fmap(one_over).join() == Option.some(0.2)
+Option.some(0).fmap(one_over).join() == Option.none()
+Option.none().fmap(one_over).join() == Option.none()
+```
+
+As a matter of practice, most monads will implement all three; `bind`, `fmap`, and `join`. Annoyingly, different languages and libraries name these functions different things, but they're probably there under different names.
+
+## The Monad Laws with `fmap` and `join`
+
+A lot of these laws are the exact same.
+
+ * For any type `t`, and Monad type `M`, `M t` is the type of the Monad holding that type.
+ * _Monads can hold values_
+
+&nbsp;
+
+ * There is a function called 'unit' or 'return' that has type `t -> M t` which injects a value of type `t` into a Monad of type `M t` in some simple way.
+ * _There is a function to create Monads from regular values_
+
+&nbsp;
+
+ * There is a mapping operation of type `M t -> (t -> u) -> M u` which maps the value of a Monad of type `M t` into another Monad of type `M u` by using a function that maps a value of type `t` into a Monad of type `M u`
+ * _There is an fmap function, as discussed earlier_
+
+&nbsp;
+
+ * There is a mapping operation of type `M M t ->  M t` which
+ * _There is an fmap function, as discussed earlier_
+
+&nbsp;
+
+These above laws also have to follow a set of rules that determines how the above functions can be combined. These rules are very similar to the `bind` rules.
+
+&nbsp;
+
+ * The identity function acts as the neutral element of fmap
+ * _Calling fmap on the function f(x) = x doesn't do anything_
+
+Example:
+
+```python
+            Option.some(5).fmap(lambda x: x) == Option.some(5)
+```
+
+&nbsp;
+
+ * The unit function acts as the neutral element of the composition of fmap and join.
+ * _Join doesn't do anything weird to values._
+
+Example:
+
+```python
+            Option.some(5).fmap(Option.some).join() == Option.some(5)
+```
+
+&nbsp;
+
+ * Fmapping two functions in series is the same as Fmapping the result of composing those two functions.
+ * _You don't have to worry about fmapping doing weird things to your values; an example is really useful here_
+
+```python
+            def plus_one(x):
+                return x + 1
+
+            def plus_two(x):
+                return x + 2
+
+            Option.some(5).fmap(plus_one).fmap(plus_two) == Option.some(5) \
+                .bind(lambda x: plus_two(plus_one(x)))
+```
 
 # The Zeroth Monad
 
@@ -1011,6 +1176,7 @@ def join(ls):
             new.append(item)
     return new
 
+# bind can be defined entirely with the other two!
 def bind(ls, function):
     return join(fmap(ls, function))
 ```
@@ -1041,7 +1207,13 @@ def sqrts(x):
     else:
         return [sqrt(x), -sqrt(x)]
 
-bind(less_than_abs(3), sqrts)
+bind(
+    bind(
+        [3],
+        less_than_abs
+    ),
+    sqrts
+)
 # [0.0, 1.0, -1.0, 1.4142135623730951, -1.4142135623730951]
 ```
 

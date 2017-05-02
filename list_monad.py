@@ -35,4 +35,7 @@ def sqrts(x):
     else:
         return [sqrt(x), -sqrt(x)]
 
-print(bind(less_than_abs(3), sqrts))
+print(bind(
+    bind([3], less_than_abs),
+    sqrts
+))
