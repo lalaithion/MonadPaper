@@ -1,11 +1,13 @@
 ---
-title: Monads Explained
+title: Monads by Example
 author: Izaak Weiss
 ---
 
 # What are Monads?
 
-It is entirely reasonable that this is the first question that anyone learning  Monads asks, and it is also entirely reasonable that anyone who is teaching Monads tries to answer it. However, Monads are a complex concept that cannot be explained in a single sentence or even a single paragraph; to understand monads you must simultaneously understand the problem they are trying to solve, their implementation, the interface for working with them, and the theoretical computational background. Therefore, I will not try and answer this question in a single phrase; my explanation of what Monads are is the entirety of this paper.
+It is entirely reasonable that this is the first question that anyone learning  Monads asks, and it is also entirely reasonable that anyone who is teaching Monads tries to answer it. However, Monads are a complex concept that cannot be explained in a single sentence or even a single paragraph; to understand Monads you must simultaneously understand the problem they are trying to solve, their implementation, the interface for working with them, and the theoretical computational background. Therefore, I will not try and answer this question in a single phrase; my explanation of what Monads are is the entirety of this paper.
+
+I would like to take a few moments and clear up one possible misconception. Monads are not special. They are a data structure, just like a Linked List or a Dictionary. They have methods that you can call, and they store data in the same way. They don't have a common sounding name, so they seem scary, and people have a tendency to define them using complex math or weird analogies, but I firmly believe that Monads aren't actually any more complicated than the run of the mill data structures that programmers use every day.
 
 # Our First Monads
 
@@ -91,7 +93,7 @@ def divide_elements(ls, i1, i2):
     return division(v1, v2)
 ```
 
-This code works nicely; you can throw two types of errors at it, and it returns `None` when either error would occur. `divide_elements([1,2,3,0],1,10)` and `divide_elements([1,2,3,0],1,3)` both return `None`, and `divide_elements([1,2,3,0],1,2)` returns `0.666666`.
+This code works nicely; you can throw two types of errors at it, and it returns `None` when either error would occur. `divide_elements( [1,2,3,0],1,10)` and `divide_elements([1,2,3,0],1,3)` both return `None`, and `divide_elements([1,2,3,0],1,2)` returns `0.666666`.
 
 This is nothing special so far. All we've done is rewritten a piece of code so that it doesn't throw an exception. In fact, we've probably made the code worse; python is built around dynamic types and exception throwing, so the more pythonic way of writing the above code is more like the following.
 
@@ -103,7 +105,7 @@ def divide_elements(ls, i1, i2):
         return None
 ```
 
-However, consider these problems in a language like C. No exceptions, no dynamic return types, and no returning multiple values. This isn't to say the problem can't be solved. C programmers have their own ways of getting around this sort of problem. But different languages have different requirements, and there are many ways to solve a problem. Next up I'm going to introduce our first monad, a monad that helps deal with the problem we faced above - it's not the only way, but it's an elegant way that works in statically typed languages without exceptions.
+However, consider these problems in a language like C. No exceptions, no dynamic return types, and no returning multiple values. This isn't to say the problem can't be solved. C programmers have their own ways of getting around this sort of problem. But different languages have different requirements, and there are many ways to solve a problem. Next up I'm going to introduce our first Monad, a Monad that helps deal with the problem we faced above - it's not the only way, but it's an elegant way that works in statically typed languages without exceptions.
 
 ## Our First Monad
 
@@ -162,7 +164,7 @@ class OptionException(Exception):
     pass
 ```
 
-This is how you create a custom exception in python. I could have used a built in error if I wanted, but I wanted it to be clear that this was part of the Option Monad that was causing the exception and not something else. You probably should object at this point, and yell at me, saying something like, "isn't the whole point of the Option monad to get rid of exceptions?" Well, if you use the Option Monad correctly, you'll never run into this exception.
+This is how you create a custom exception in python. I could have used a built in error if I wanted, but I wanted it to be clear that this was part of the Option Monad that was causing the exception and not something else. You probably should object at this point, and yell at me, saying something like, "isn't the whole point of the Option Monad to get rid of exceptions?" Well, if you use the Option Monad correctly, you'll never run into this exception.
 
 ```python
 class Option:
@@ -291,7 +293,7 @@ You may still think this sort of thing is useless; and in python, for such a sim
 
 ## A More Complex Example
 
-In order to give a more illustrative example of where the Option Monad can be more useful, consider the following problem; open a file, and read the first whitespace separated word from the beginning of the file, and parse it into an integer if possible. This problem is fairly easy to do with built in python functions, but the Option monad can make error handling easier. However, none of python's built in functions use the Option monad, so we will have to rewrite them so that they do. In languages with the Option monad as a star player, this isn't an issue.
+In order to give a more illustrative example of where the Option Monad can be more useful, consider the following problem; open a file, and read the first whitespace separated word from the beginning of the file, and parse it into an integer if possible. This problem is fairly easy to do with built in python functions, but the Option Monad can make error handling easier. However, none of python's built in functions use the Option Monad, so we will have to rewrite them so that they do. In languages with the Option Monad as a star player, this isn't an issue.
 
 ```python
 def option_open(filename, mode='r'):
@@ -457,7 +459,8 @@ class Result:
     def error(cls, msg):
         return cls(True, None, msg)
 
-# The following are built in functions rewritten to work with the Result Monad
+# The following are built in functions
+# rewritten to work with the Result Monad
 
 def result_open(filename, mode='r'):
     try:
@@ -518,7 +521,7 @@ print(result)
 
 ## Either Monad
 
-Another common monad that is not worth writing in python but invaluable in some other languages, and is in fact a more general form of the Result Monad, is the Either Monad. An Either Monad is really useful in strictly typed languages, because it can be returned from a function that can return two possible types.
+Another common Monad that is not worth writing in python but invaluable in some other languages, and is in fact a more general form of the Result Monad, is the Either Monad. An Either Monad is really useful in strictly typed languages, because it can be returned from a function that can return two possible types.
 
 I'm not going to implement this in python, because this is mostly useless for a python program, but it's essentially identical to the Result Monad implementation. Try it out!
 
@@ -558,14 +561,14 @@ I'm going to slightly deviate from our already established order to introduce th
             try:
                 current = text[0]
             except IndexError:
-                return Result.error('End of String encountered, but '
-                    + '{} is still expected'.format(repr(val)))
+                return Result.error('End of String encountered'
+                    ', but {} is still expected'.format(repr(val)))
             
             if current == val:
                 return Result.ok((text[0], text[1:]))
             else:
-                return Result.error('Failed to match character {} at {}'
-                    .format(repr(val), repr(text)))
+                return Result.error('Failed to match character' +
+                    ' {} at {}'.format(repr(val), repr(text)))
 
         return Parser(match_char)
 
@@ -584,8 +587,8 @@ I'm going to slightly deviate from our already established order to introduce th
             try:
                 current = text[0]
             except IndexError:
-                return Result.error('End of String encountered, but one of '
-                    + '{} is still expected'.format(list(charls)))
+                return Result.error('End of String encountered, but '
+                    'one of {} is still expected'.format(list(charls)))
 
             if current in charls:
                 return Result.ok((text[0], text[1:]))
@@ -602,14 +605,15 @@ I'm going to slightly deviate from our already established order to introduce th
             try:
                 current = text[0]
             except IndexError:
-                return Result.error('End of String encountered, but none of '
-                    + '{} is still expected'.format(repr(text)))
+                return Result.error('End of String encountered,'
+                    ' but none of {} is still expected'.format(repr(text)))
 
             if current not in charls:
                 return Result.ok((text[0], text[1:]))
             else:
-                return Result.error('Found one of {} at {} when'
-                    + 'there should be none of'.format(list(charls), repr(text)))
+                return Result.error('Found one of'
+                    ' {} at {} when there should be none of'.format(
+                    list(charls), repr(text)))
 
         return Parser(none_charls)
 ```
@@ -746,7 +750,8 @@ Now we can move on to the Monadic functions.
     def bind(self, function):
         
         def bind_func(result):
-            function(result[0]).bind(lambda x: Result.ok(x, result[1]))
+            function(result[0]).bind(lambda x:
+                Result.ok(x, result[1]))
 
         return Parser(lambda text: self(text).bind(bind_func))
 ```
@@ -790,8 +795,9 @@ Finally, let's write some functions that actually call the parser on some string
             if tup[1] == '':
                 return Result.ok(tup[0])
             else:
-                return Result.error('The match did not consist of the entire '
-                    + 'string: {} was left over'.format(repr(tup[1])))
+                return Result.error('The match did not consist '
+                    'of the entire string: {} was left over'.format(
+                    repr(tup[1])))
             
         return self(string) >> check_full
 ```
@@ -818,7 +824,8 @@ Now, we need an exponent part, which is pretty simple given the above. However, 
 
 ```python
 sign = (Parser.char('+') | Parser.char('-')).optional()
-exponent = ((Parser.char('e') | Parser.char('E')) + sign + digits).optional()
+exponent = ((Parser.char('e') | Parser.char('E'))
+             + sign + digits).optional()
 ```
 
 Finally, we can put these three together to get:
@@ -833,7 +840,8 @@ Here's our finished code, and it's results on some possible inputs:
 digits = Parser.oneof('0123456789').many1()
 decimal = (Parser.char('.') + digits).optional()
 sign = (Parser.char('+') | Parser.char('-')).optional()
-exponent = ((Parser.char('e') | Parser.char('E')) + sign + digits).optional()
+exponent = ((Parser.char('e') | Parser.char('E'))
+            + sign + digits).optional()
 number = sign + digits + decimal + exponent
 
 Parser.parse_total(number, '12')
@@ -938,10 +946,14 @@ Expr = namedtuple('Expr', ['Op','e1','e2'])
 
 openp = Parser.char('(') + whitespace.optional()
 closep = whitespace.optional() + Parser.char(')')
-plus = whitespace.optional() + Parser.char('+') + whitespace.optional()
-minus = whitespace.optional() + Parser.char('-') + whitespace.optional()
-times = whitespace.optional() + Parser.char('*') + whitespace.optional()
-div = whitespace.optional() + Parser.char('/') + whitespace.optional()
+plus = whitespace.optional() + Parser.char('+')
+        + whitespace.optional()
+minus = whitespace.optional() + Parser.char('-')
+        + whitespace.optional()
+times = whitespace.optional() + Parser.char('*')
+        + whitespace.optional()
+div = whitespace.optional() + Parser.char('/')
+        + whitespace.optional()
 
 Plus = lambda x: Expr(Op.PLUS, x[0], x[1])
 Minus = lambda x: Expr(Op.MINUS, x[0], x[1])
@@ -950,10 +962,14 @@ Div = lambda x: Expr(Op.DIV, x[0], x[1])
 
 def expr(text):
     # rec stands for recursive
-    rec_plus = ((openp >= Parser(expr)) & (plus >= Parser(expr))) <= closep
-    rec_minus = ((openp >= Parser(expr)) & (minus >= Parser(expr))) <= closep
-    rec_times = ((openp >= Parser(expr)) & (times >= Parser(expr))) <= closep
-    rec_div = ((openp >= Parser(expr)) & (div >= Parser(expr))) <= closep
+    rec_plus = ((openp >= Parser(expr))
+                & (plus >= Parser(expr))) <= closep
+    rec_minus = ((openp >= Parser(expr))
+                & (minus >= Parser(expr))) <= closep
+    rec_times = ((openp >= Parser(expr))
+                & (times >= Parser(expr))) <= closep
+    rec_div = ((openp >= Parser(expr))
+                & (div >= Parser(expr))) <= closep
     
     full = (
                 (rec_plus > Plus)
@@ -985,7 +1001,7 @@ print(Parser(expr).parse_total(text))
 # )
 ```
 
-# Theory Time
+# Theory of Monads
 
 Now that we've seen many types of Monads, we should discuss the technical, boring discussion of what a Monad is. A Monad is, in essence, any construct, usually an object, in a language that satisfies the following criteria. I will say each criterion in two ways; a simple way, and a correct way.
 
@@ -994,37 +1010,23 @@ However, there are two ways to define Monads. The two definitions in practice le
 ## The Monad Laws with `bind`
 
  * For any type `t`, and Monad type `M`, `M t` is the type of the Monad holding that type.
- * _Monads can hold values_
-
-&nbsp;
-
+    * _Monads can hold values_
  * There is a function called 'unit' or 'return' that has type `t -> M t` which injects a value of type `t` into a Monad of type `M t` in some simple way.
- * _There is a function to create Monads from regular values_
-
-&nbsp;
-
+    * _There is a function to create Monads from regular values_
  * There is a binding operation of type `M t -> (t -> M u) -> M u` which maps the value of a Monad of type `M t` into another Monad of type `M u` by using a function that maps a value of type `t` into a Monad of type `M u`
- * _There is a bind function, as discussed earlier_
-
-&nbsp;
+    * _There is a bind function, as discussed earlier_
 
 These above laws also have to follow a set of rules that determines how the above functions can be combined. These rules are super simple; basically they just exist to make sure that the bind function and the constructor don't do anything funky.
 
-&nbsp;
-
  * The unit function acts as a neutral element of bind
- * _Calling bind on the unit function (or constructor) doesn't do anything_
-
-Example:
+    * _Calling bind on the unit function (or constructor) doesn't do anything_
 
 ```python
             Option.some(5).bind(Option.some) == Option.some(5)
 ```
 
-&nbsp;
-
  * Binding two functions in series is the same as binding the result of composing those two functions
- * _You don't have to worry about binding doing weird things to your values; an example is really useful here_
+    * _You don't have to worry about binding doing weird things to your values; an example is really useful here_
 
 ```python
             def one_over(x):
@@ -1037,8 +1039,8 @@ Example:
                     return Option.none()
                 return Option.some(2/x)
 
-            Option.some(5).bind(one_over).bind(two_over) == Option.some(5) \
-                .bind(lambda x: one_over(x).bind(two_over))
+            Option.some(5).bind(one_over).bind(two_over) == \
+            Option.some(5).bind(lambda x: one_over(x).bind(two_over))
 ```
 
 ## `fmap` and `join`
@@ -1088,51 +1090,58 @@ Option.some(0).fmap(one_over).join() == Option.none()
 Option.none().fmap(one_over).join() == Option.none()
 ```
 
-As a matter of practice, most monads will implement all three; `bind`, `fmap`, and `join`. Annoyingly, different languages and libraries name these functions different things, but they're probably there under different names.
+As a matter of practice, most Monads will implement all three; `bind`, `fmap`, and `join`. Annoyingly, different languages and libraries name these functions different things, but they're probably there under different names.
+
+A simple proof that it doesn't matter if you use `bind` or `fmap` and `join` is to simply use one set to implement the other. In the following code, I will do that for the Result monad.
+
+```python
+# bind implemented for a monad that only has fmap and join
+def bind(result, function):
+    return result.fmap(function).join()
+
+# fmap and join implemented for a monad that only has bind
+def fmap(result, function):
+    always_works = lambda x: Result.ok(function(x))
+    return result.bind(always_works)
+
+def join(result):
+    returns_self: lambda x: x
+    return result.bind(returns_self)
+```
+
+In the above code, we can see that `bind` is defined by first `fmap`ing the function over the Monad, producing something like `Result.ok(Result.ok(3))`, and then joining those two layers into one; the same behavior that `bind` usually has.
+
+`fmap` is defined by simply creating a version of the function that works with `bind`; since `fmap` is supposed to take a function that doesn't return a Monad, and thus always succeeds, we can just wrap the result of that in a `Result.ok()`
+
+`join` is super simple; `join` is supposed to collapse two layers of Monads into one. We can do this by simply `bind`ing a function that simply returns itself; this will be passed the inner layer of the nested Monad, and return that as the new Monad.
 
 ## The Monad Laws with `fmap` and `join`
 
 A lot of these laws are the exact same.
 
  * For any type `t`, and Monad type `M`, `M t` is the type of the Monad holding that type.
- * _Monads can hold values_
-
-&nbsp;
+    * _Monads can hold values_
 
  * There is a function called 'unit' or 'return' that has type `t -> M t` which injects a value of type `t` into a Monad of type `M t` in some simple way.
- * _There is a function to create Monads from regular values_
-
-&nbsp;
+    * _There is a function to create Monads from regular values_
 
  * There is a mapping operation of type `M t -> (t -> u) -> M u` which maps the value of a Monad of type `M t` into another Monad of type `M u` by using a function that maps a value of type `t` into a Monad of type `M u`
- * _There is an fmap function, as discussed earlier_
-
-&nbsp;
+    * _There is an fmap function, as discussed earlier_
 
  * There is a mapping operation of type `M M t ->  M t` which
- * _There is an fmap function, as discussed earlier_
-
-&nbsp;
+    * _There is an fmap function, as discussed earlier_
 
 These above laws also have to follow a set of rules that determines how the above functions can be combined. These rules are very similar to the `bind` rules.
 
-&nbsp;
-
  * The identity function acts as the neutral element of fmap
- * _Calling fmap on the function f(x) = x doesn't do anything_
-
-Example:
+    * _Calling fmap on the function f(x) = x doesn't do anything_
 
 ```python
             Option.some(5).fmap(lambda x: x) == Option.some(5)
 ```
 
-&nbsp;
-
  * The unit function acts as the neutral element of the composition of fmap and join.
- * _Join doesn't do anything weird to values._
-
-Example:
+    * _Join doesn't do anything weird to values._
 
 ```python
             Option.some(5).fmap(Option.some).join() == Option.some(5)
@@ -1141,7 +1150,7 @@ Example:
 &nbsp;
 
  * Fmapping two functions in series is the same as Fmapping the result of composing those two functions.
- * _You don't have to worry about fmapping doing weird things to your values; an example is really useful here_
+    * _You don't have to worry about fmapping doing weird things to your values; an example is really useful here_
 
 ```python
             def plus_one(x):
@@ -1156,7 +1165,7 @@ Example:
 
 # The Zeroth Monad
 
-Our first section was titled 'Our First Monad'. However, we are computer scientists, and therefore we start counting at zero, not at one. So let's talk about another Monad that everyone reading this document has probably used, but never noticed that it was a monad. A list.
+Our first section was titled 'Our First Monad'. However, we are computer scientists, and therefore we start counting at zero, not at one. So let's talk about another Monad that everyone reading this document has probably used, but never noticed that it was a Monad. A list.
 
 How is a list a Monad? Well, from the previous section, a Monad is really just anything with a `bind` function, or with a `fmap` and a `join` function. And while not every programming language has these functions built in, we can easily write these functions for a list.
 
