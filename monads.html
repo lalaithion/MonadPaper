@@ -3,21 +3,23 @@
 <p>I would like to take a few moments and clear up one possible misconception. Monads are not special. They are a data structure, just like a Linked List or a Dictionary. They have methods that you can call, and they store data in the same way. They don't have a common sounding name, so they seem scary, and people have a tendency to define them using complex math or weird analogies, but I firmly believe that Monads aren't actually any more complicated than the run of the mill data structures that programmers use every day.</p>
 <h1 id="our-first-monads"><span class="header-section-number">2</span> Our First Monads</h1>
 <p>In this section, we'll explore a common problem surrounding how to report errors to the caller of a function.</p>
-<h2 id="division"><span class="header-section-number">2.1</span> Division</h2>
+<h2 id="error-handling-in-plain-python"><span class="header-section-number">2.1</span> Error Handling in Plain Python</h2>
+<p>Python usually uses Exception raising and catching to report errors that happen within code. It's a desirable feature to have in a scripting language, but it is less useful in systems languages, like C, Go, or Rust, because exceptions are expensive in terms of memory and CPU time. It's also less useful in functional languages like Haskell or Scala, which use types and abstract data structures to make code more predictable and safer, a goal which is undermined when code can throw exceptions that crash the whole program. In the following section, I'll be exploring ways to handle errors in Python without throwing exceptions and without using Monads.</p>
+<h3 id="division"><span class="header-section-number">2.1.1</span> Division</h3>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">def</span> division(x, y):
     <span class="cf">return</span> x <span class="op">/</span> y</code></pre></div>
-<p>Consider the above code fragment. This is a very simple function; one that is so simple it hardly deserves to exist. However, this function, despite it's simplicity, can throw an error if it's inputs are badly formed. <code>division(1.0,0.0)</code> will throw a <code>ZeroDivisionError: division by zero</code>. It's possible that we want to recover from this error gracefully; check the inputs and see if an error will occur, and return some error code instead of raising an exception.</p>
-<p>However, we must decide what the error code should be. We can't choose <code>0.0</code>, because that is correctly returned by <code>division(0.0,1.0)</code>. We can't choose <code>-1.0</code>, because that is correctly returned by <code>division(-1.0,1.0)</code>. In fact, this function can return any possible floating point number, so we can't choose a floating point number as our error code. Luckily, python is dynamically typed, so we can return a float on success, but <code>None</code> on failure.</p>
+<p>Consider the above code fragment. This is a very simple function; one that is so simple it hardly deserves to exist. However, if <code>y</code> is zero, this function can throw a <code>ZeroDevisionError</code>. It's possible that we want to recover from this error gracefully; check the inputs and see if an error will occur, and return some error code instead of raising an exception.</p>
+<p>However, we must decide what the error code should be. We can't choose <code>0.0</code>, because that is correctly returned by <code>division(0.0,1.0)</code>. We can't choose <code>-1.0</code>, because that is correctly returned by <code>division(-1.0,1.0)</code>. In fact, this function can return any possible floating point number, so we can't choose a floating point number as our error code. One solution is to return a float on success, but <code>None</code> on failure.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">def</span> division(x, y):
     <span class="cf">if</span> y <span class="op">==</span> <span class="dv">0</span>:
         <span class="cf">return</span> <span class="va">None</span>
     <span class="cf">return</span> x <span class="op">/</span> y</code></pre></div>
 <p>Now we've written a function that checks whether or not division is possible, and performs division if it is, but returns an error code if it is not.</p>
-<h2 id="indexing"><span class="header-section-number">2.2</span> Indexing</h2>
+<h3 id="indexing"><span class="header-section-number">2.1.2</span> Indexing</h3>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">def</span> index(ls, i):
     <span class="cf">return</span> ls[i]</code></pre></div>
-<p>The above code is similar to the last example; it will perform an index lookup into a list, and return the item from the list if it can. If it can't, we're still left with the problem that it throws an exception. <code>index([1,2,3],10)</code> throws an <code>IndexError: list index out of range</code>. Let's try and do the same thing as above; rewrite this function so that it doesn't throw an error, but instead uses an error code to signal something has gone wrong.</p>
-<p>Our first guess might be to have our error code be the same as above, and just return <code>None</code>. However, this isn't possible, because the code <code>index([None], 0)</code> would also return <code>None</code>, making it impossible to tell in practice if we have an error or not. In fact, python lets any value be inside of a list; there is no possible error code we can return that can't also be in the list. Luckily again, python lets us use multiple return values.</p>
+<p>The above code is similar to the last example; it will perform an index lookup into a list, and return the item from the list if it can. If it can't, we're still left with the problem that it throws an exception if the index is out of bounds. Let's try and do the same thing as above; rewrite this function so that it doesn't throw an error, but instead uses an error code to signal something has gone wrong.</p>
+<p>Our first guess might be to have our error code be the same as above, and just return <code>None</code>. However, this isn't possible, because the code <code>index([None], 0)</code> would also return <code>None</code>. In fact, python lets any value be inside of a list; there is no possible error code we can return that can't also be in the list. Luckily, python lets us use multiple return values.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">def</span> index(ls, i):
     <span class="cf">if</span> i <span class="op">&lt;</span> <span class="dv">0</span> <span class="op">or</span> i <span class="op">&gt;=</span> <span class="bu">len</span>(ls):
         <span class="cf">return</span> <span class="va">True</span>, <span class="va">None</span>
@@ -28,10 +30,10 @@
     <span class="bu">print</span>(<span class="st">&quot;Oh no, we failed&quot;</span>)
 <span class="cf">else</span>:
     <span class="bu">print</span>(value)</code></pre></div>
-<h2 id="combining-the-above"><span class="header-section-number">2.3</span> Combining The Above</h2>
+<h3 id="combining-the-above"><span class="header-section-number">2.1.3</span> Combining The Above</h3>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">def</span> divide_elements(ls, i1, i2):
     <span class="cf">return</span> ls[i1]<span class="op">/</span>ls[i2]</code></pre></div>
-<p>Now, we've combined the two operations in python which might lead to an exception, and we've done it in a way that allows for three different operations to result in an exception. We can use the above functions to rewrite this function so that it won't throw any errors, by checking after each step for an error code.</p>
+<p>Now, we've combined the two operations in python which might lead to an exception, and we've done it in a way that allows for three different operations to result in an exception. We can rewrite this function so that it won't throw any errors, by checking after each step for an error code.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">def</span> index(ls, i):
     <span class="cf">if</span> i <span class="op">&lt;</span> <span class="dv">0</span> <span class="op">or</span> i <span class="op">&gt;=</span> <span class="bu">len</span>(ls):
         <span class="cf">return</span> <span class="va">True</span>, <span class="va">None</span>
@@ -52,34 +54,25 @@
         <span class="cf">return</span> <span class="va">None</span>
     
     <span class="cf">return</span> division(v1, v2)</code></pre></div>
-<p>This code works nicely; you can throw two types of errors at it, and it returns <code>None</code> when either error would occur. <code>divide_elements( [1,2,3,0],1,10)</code> and <code>divide_elements([1,2,3,0],1,3)</code> both return <code>None</code>, and <code>divide_elements([1,2,3,0],1,2)</code> returns <code>0.666666</code>.</p>
-<p>This is nothing special so far. All we've done is rewritten a piece of code so that it doesn't throw an exception. In fact, we've probably made the code worse; python is built around dynamic types and exception throwing, so the more pythonic way of writing the above code is more like the following.</p>
+<p>This code works nicely; you can throw two types of errors at it, and it returns <code>None</code> when either error would occur.</p>
+<p>This is nothing special so far. All we've done is rewritten a piece of code so that it doesn't throw an exception. In fact, we've probably made the code worse; python is built around throwing and catching exceptions, so we could have written it as:</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">def</span> divide_elements(ls, i1, i2):
     <span class="cf">try</span>:
         <span class="cf">return</span> ls[i1]<span class="op">/</span>ls[i2]
     <span class="cf">except</span> (<span class="pp">IndexError</span>, <span class="pp">ZeroDivisionError</span>):
         <span class="cf">return</span> <span class="va">None</span></code></pre></div>
-<p>However, consider these problems in a language like C. No exceptions, no dynamic return types, and no returning multiple values. This isn't to say the problem can't be solved. C programmers have their own ways of getting around this sort of problem. But different languages have different requirements, and there are many ways to solve a problem. Next up I'm going to introduce our first Monad, a Monad that helps deal with the problem we faced above - it's not the only way, but it's an elegant way that works in statically typed languages without exceptions.</p>
-<h2 id="our-first-monad"><span class="header-section-number">2.4</span> Our First Monad</h2>
-<p>The Option Monad, also called the Maybe Monad in many programming languages, is a way of representing the result of a function, the result of any computation, that might result in an error and produce no meaningful output. We call an Option Monad that has a value and represents a successful computation Some, and we call one that doesn't have a value and represents a failed computation None.</p>
+<p><strong><em>THIS IS WHERE I TALK ABOUT LANGUAGES</em></strong></p>
+<h2 id="the-option-monad"><span class="header-section-number">2.2</span> The Option Monad</h2>
+<p>The Option Monad, also called the Maybe Monad in many programming languages, is a way of representing the result of a function or computation that might result in an error and produce no meaningful output. We call an Option Monad that has a value and represents a successful computation Some, and we call one that doesn't have a value and represents a failed computation Nothing.</p>
 <p>These are really easy to write in programming languages like Haskell, Scala, or Rust, but I'm going to write it in Python to help avoid any confusion about the inner workings of the Monad. In the end, all Monads are just objects, like trees, lists, or dictionaries.</p>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">class</span> OptionException(<span class="pp">Exception</span>):
-    <span class="cf">pass</span>
-
-<span class="kw">class</span> Option:
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">class</span> Option:
     <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, failed, value):
         <span class="va">self</span>._failed <span class="op">=</span> failed
         <span class="va">self</span>._value <span class="op">=</span> value
 
     <span class="kw">def</span> <span class="fu">__repr__</span>(<span class="va">self</span>):
         <span class="cf">if</span> <span class="va">self</span>._failed:
-            <span class="cf">return</span> <span class="st">&#39;Option.none()&#39;</span>
-        <span class="cf">else</span>:
-            <span class="cf">return</span> <span class="st">&#39;Option.some({})&#39;</span>.<span class="bu">format</span>(<span class="va">self</span>._value)
-
-    <span class="kw">def</span> <span class="fu">__str__</span>(<span class="va">self</span>):
-        <span class="cf">if</span> <span class="va">self</span>._failed:
-            <span class="cf">return</span> <span class="st">&#39;None&#39;</span>
+            <span class="cf">return</span> <span class="st">&#39;Nothing&#39;</span>
         <span class="cf">else</span>:
             <span class="cf">return</span> <span class="st">&#39;Some({})&#39;</span>.<span class="bu">format</span>(<span class="va">self</span>._value)
             
@@ -93,7 +86,7 @@
 
     <span class="kw">def</span> unwrap(<span class="va">self</span>):
         <span class="cf">if</span> <span class="va">self</span>._failed:
-            <span class="cf">raise</span> OptionException(<span class="st">&#39;This Option has no value&#39;</span>)
+            <span class="cf">raise</span> <span class="pp">Exception</span>(<span class="st">&#39;This Option has no value&#39;</span>)
         <span class="cf">else</span>:
             <span class="cf">return</span> <span class="va">self</span>._value
     
@@ -105,26 +98,18 @@
     <span class="kw">def</span> none(cls):
         <span class="cf">return</span> cls(<span class="va">True</span>, <span class="va">None</span>)</code></pre></div>
 <p>This is the longest piece of code we've had so far, so let me break it down bit by bit.</p>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">class</span> OptionException(<span class="pp">Exception</span>):
-    <span class="cf">pass</span></code></pre></div>
-<p>This is how you create a custom exception in python. I could have used a built in error if I wanted, but I wanted it to be clear that this was part of the Option Monad that was causing the exception and not something else. You probably should object at this point, and yell at me, saying something like, &quot;isn't the whole point of the Option Monad to get rid of exceptions?&quot; Well, if you use the Option Monad correctly, you'll never run into this exception.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">class</span> Option:
     <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, failed, value):
         <span class="va">self</span>._failed <span class="op">=</span> failed
-        <span class="va">self</span>._value <span class="op">=</span> value</code></pre></div>
-<p>The <code>__init__</code> function is the constructor or initializer function for classes in python. Here all we do is create a boolean that indicates whether or not we have failed the computation or not, and if we haven't failed it, we store the result of the computation in <code>_value</code>. Note that if <code>_failed</code> is <code>True</code>, then we don't care what is in <code>_value</code>, because the computation has failed and that value has no meaning. I will note that the users of this class will probably never call <code>__init__</code> themselves, as we will later write alternate constructors that are easier for people to use.</p>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="kw">def</span> <span class="fu">__repr__</span>(<span class="va">self</span>):
+        <span class="va">self</span>._value <span class="op">=</span> value
+    
+    <span class="kw">def</span> <span class="fu">__repr__</span>(<span class="va">self</span>):
         <span class="cf">if</span> <span class="va">self</span>._failed:
-            <span class="cf">return</span> <span class="st">&#39;Option.none()&#39;</span>
-        <span class="cf">else</span>:
-            <span class="cf">return</span> <span class="st">&#39;Option.some({})&#39;</span>.<span class="bu">format</span>(<span class="va">self</span>._value)
-
-    <span class="kw">def</span> <span class="fu">__str__</span>(<span class="va">self</span>):
-        <span class="cf">if</span> <span class="va">self</span>._failed:
-            <span class="cf">return</span> <span class="st">&#39;None&#39;</span>
+            <span class="cf">return</span> <span class="st">&#39;Nothing&#39;</span>
         <span class="cf">else</span>:
             <span class="cf">return</span> <span class="st">&#39;Some({})&#39;</span>.<span class="bu">format</span>(<span class="va">self</span>._value)</code></pre></div>
-<p>This is how you define string representations of values in python. <code>__str__</code> is called when you cast something to a string or print it, and <code>__repr__</code> is shown in the python REPL, and is supposed to be a little more informative. But these are mostly for ease of use; they don't really matter when it comes to Monads in general.</p>
+<p>The <code>__init__</code> function is the constructor or initializer function for classes in python. Here all we do is create a boolean that indicates whether or not we have failed the computation or not, and if we haven't failed it, we store the result of the computation in <code>_value</code>. Note that if <code>_failed</code> is <code>True</code>, then we don't care what is in <code>_value</code>, because the computation has failed and that value has no meaning. I will note that the users of this class will probably never call <code>__init__</code> themselves, as we will later write alternate constructors that are easier for people to use.</p>
+<p>The <code>__repr__</code> function simply tells python how this object should be printed.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="kw">def</span> is_some(<span class="va">self</span>):
         <span class="cf">if</span> <span class="va">self</span>._failed:
             <span class="cf">return</span> <span class="va">False</span>
@@ -135,7 +120,7 @@
 
     <span class="kw">def</span> unwrap(<span class="va">self</span>):
         <span class="cf">if</span> <span class="va">self</span>._failed:
-            <span class="cf">raise</span> OptionException(<span class="st">&#39;This Option has no value&#39;</span>)
+            <span class="cf">raise</span> <span class="pp">Exception</span>(<span class="st">&#39;This Option has no value&#39;</span>)
         <span class="cf">else</span>:
             <span class="cf">return</span> <span class="va">self</span>._value</code></pre></div>
 <p>These three functions are the meat of the Option Monad; these are the ways we interact with it. The <code>is_some</code> function returns <code>True</code> when there is a meaningful return value, and <code>False</code> if the computation failed. <code>is_none</code> does the opposite. <code>unwrap</code> returns the value of the Option Monad <em>if there is a value to be returned</em>, otherwise it throws an error. In order to use the <code>unwrap</code> function without an error, you must first check and see whether the computation succeeded or failed.</p>
@@ -168,16 +153,21 @@
         <span class="cf">return</span> Option.none()
     
     <span class="cf">return</span> division(res1.unwrap(), res2.unwrap())</code></pre></div>
-<p>The above code is the exact same length in lines; and already has some benefits. One, these functions have a return type that can be determined just be looking at the code - not as useful in python as in other languages, but I hope you can see why they'd be useful in statically typed languages. Two, we don't have to remember the convention for every function. Before, we had to remember that <code>division</code> returned <code>None</code> for an error, but <code>index</code> returned <code>False, None</code> for an error. Despite these benefits, it's not that much of an improvement.</p>
+<p>The above code is the exact same length in lines; and already has some benefits. First, these functions have a return type that can be determined just be looking at the code - not as useful in python as in other languages, but they are very useful in statically typed languages. Second, we don't have to remember the convention for every function. Before, we had to remember that <code>division</code> returned <code>None</code> for an error, but <code>index</code> returned <code>False, None</code> for an error. Despite these benefits, it's not that much of an improvement.</p>
 <p>And that's because we haven't yet implemented the most important function for a Monad. This is the most important but also the most complicated part of the Option Monad, so I am going to insert a header for this.</p>
-<h2 id="the-bind-function"><span class="header-section-number">2.5</span> The Bind Function</h2>
+<h2 id="the-bind-function"><span class="header-section-number">2.3</span> The Bind Function</h2>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="kw">def</span> bind(<span class="va">self</span>, function):
         <span class="cf">if</span> <span class="va">self</span>.is_none():
-            <span class="cf">return</span> <span class="bu">type</span>(<span class="va">self</span>).none()
+            <span class="cf">return</span> <span class="va">self</span>
         
         val <span class="op">=</span> <span class="va">self</span>.unwrap()
         <span class="cf">return</span> function(val)</code></pre></div>
-<p>The bind function first checks whether or not <code>self</code> is None or Some. If <code>self</code> is None, then we return a new None instance. If self is Some, we unwrap the value, and pass it into the function, returning what the function returns. Because we're sort of pretending to be in a typed language here, we should remember that the function passed in <em>should</em> return an Option Monad.</p>
+<p>The bind function is higher order function. That means it's a function that takes another function as an argument, and does something with that function. If you look in the end of the previous section, we repeated this piece of code two times:</p>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    res <span class="op">=</span> index(ls, i1)
+    <span class="cf">if</span> res.is_none():
+        <span class="cf">return</span> Option.none()</code></pre></div>
+<p>We were checking whether or not a function had successfully computed a value, or whether an error had occurred. If the value existed, we later passed that value into a function. If the value did not exist, then we simply returned the indication of failure, an <code>Option.none()</code> object.</p>
+<p>Looking at bind, we can see it does exactly that. <code>res.bind(function)</code> checks whether or not <code>res</code> is a successfully computed value, in which case it passes that value into <code>function</code>, or if it is a failed computation, in which case it simply returns itself, passing the failed computation forward.</p>
 <p>So, with <code>bind</code> in mind, let's consider the our code again.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">def</span> division(x, y):
     <span class="cf">if</span> y <span class="op">==</span> <span class="dv">0</span>:
@@ -196,11 +186,21 @@
     partial <span class="op">=</span> <span class="kw">lambda</span> x: <span class="kw">lambda</span> y: division(x,y)
     
     <span class="cf">return</span> res2.bind(res1.bind(partial))</code></pre></div>
-<p>I've changed a few things, so go back and look at what I've done. There's this new line <code>partial = lambda x: lambda y: division(x,y)</code>. This is a way of defining an inline function in python; here, I have a function of x that returns a function of y, that itself returns <code>division(x,y)</code>. That's a bit complicated, so think about it for a second.</p>
-<p>What I then do on the return statement line is I use bind to apply the function to these arguments; the function <code>division</code> will fail drastically if it gets an Option Monad in as an argument; it would fail on the comparison to zero and it would also fail on trying to divide two Option Monads. By using <code>bind</code>, I am telling the Options to apply the function to themselves if they have a value, or returning None if they don't have a value. This wraps the error handling into the data structure that represents errors without me having to ever write an explicit <code>if x.is_some():</code> check.</p>
-<p>You may still think this sort of thing is useless; and in python, for such a simple example, it kinda is! But as we continue to explore Monads, we will encounter some weirder and wilder examples of things that Monads make simpler.</p>
-<h2 id="a-more-complex-example"><span class="header-section-number">2.6</span> A More Complex Example</h2>
-<p>In order to give a more illustrative example of where the Option Monad can be more useful, consider the following problem; open a file, and read the first whitespace separated word from the beginning of the file, and parse it into an integer if possible. This problem is fairly easy to do with built in python functions, but the Option Monad can make error handling easier. However, none of python's built in functions use the Option Monad, so we will have to rewrite them so that they do. In languages with the Option Monad as a star player, this isn't an issue.</p>
+<p>I've changed a few things, so go back and look at what I've done. There's this new line <code>partial = lambda x: lambda y: division(x,y)</code>. This is a way of defining an inline function in python; here, I have a function of x that returns a function of y, that itself returns <code>division(x,y)</code>. This makes it so that instead of calling this function with two arguments, I instead call it with one argument twice. Here's an example of using a similar lambda function:</p>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">partial <span class="op">=</span> <span class="kw">lambda</span> x: <span class="kw">lambda</span> y: x<span class="op">/</span>y
+
+two_over <span class="op">=</span> partial(<span class="dv">2</span>)
+two_over(<span class="dv">3</span>) <span class="co"># same as 2 / 3</span>
+two_over(<span class="dv">5</span>) <span class="co"># same as 2 / 5</span>
+
+ten_over <span class="op">=</span> partial(<span class="dv">10</span>)
+ten_over(<span class="dv">50</span>) <span class="co"># same as 10 / 50</span>
+
+partial(<span class="dv">3</span>)(<span class="dv">4</span>) <span class="co"># same as 3 / 4</span></code></pre></div>
+<p>What I do on the return statement line is I use bind to apply the function to these arguments; the function <code>division</code> will fail drastically if it gets an Option Monad in as an argument; it would fail on the comparison to zero and it would also fail on trying to divide two Option Monads. By using <code>bind</code>, I am telling the Options to apply the function to themselves if they have a value, or returning Nothing if they don't have a value. This wraps the error handling into the data structure that represents errors without me having to ever write an explicit <code>if x.is_some():</code> check.</p>
+<p>You may still think this sort of thing is useless; and in python, for such a simple example, it kinda is! But as we continue to explore Monads, we will encounter some examples of things that get more and more complex without Monads, but that Monads make simpler. Oh hey look, that's the next section.</p>
+<h2 id="a-more-complex-example"><span class="header-section-number">2.4</span> A More Complex Example</h2>
+<p>In order to give a more illustrative example of where the Option Monad can be more useful, consider the following problem; open a file, and read the first whitespace separated word from the beginning of the file, and parse it into an integer if possible. This problem is fairly easy to do with built in Python functions, but the Option Monad can make error handling easier. However, none of Python's built in functions use the Option Monad, so we will have to rewrite them so that they do. In languages with the Option Monad as a star player, such as Rust, Haskell, or Scala, this isn't an issue.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">def</span> option_open(filename, mode<span class="op">=</span><span class="st">&#39;r&#39;</span>):
     <span class="cf">try</span>:
         fd <span class="op">=</span> Option.some(<span class="bu">open</span>(filename, mode<span class="op">=</span>mode))
@@ -245,18 +245,18 @@
         i <span class="op">=</span> Option.none()
 
     <span class="cf">return</span> i</code></pre></div>
-<p>I'm not going to explain these functions too much; basically they do the same thing as their built in python counterparts, but they return Some if the computation succeeds and None if it fails, instead of throwing an error or using some other return code. This will allow us to use <code>bind</code> to chain these functions.</p>
+<p>These functions perform the exact same operations as their Python counterparts, but they return Some if the computation succeeds and Nothing if it fails, instead of throwing an error or using some other return code. This will allow us to use <code>bind</code> to chain these functions.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">result <span class="op">=</span> (Option.some(<span class="st">&#39;text.txt&#39;</span>)
-.bind(option_open)
-.bind(option_read)
-.bind(<span class="kw">lambda</span> x: option_match(<span class="vs">r&#39;\s*(\S*)&#39;</span>, x))
-.bind(<span class="kw">lambda</span> x: option_get_group(x, <span class="dv">1</span>))
-.bind(option_int))</code></pre></div>
-<p>This code is useful because if an error happens at any time during the computation, it just passes a None Option through the rest of the bind functions.</p>
+    .bind(option_open)
+    .bind(option_read)
+    .bind(<span class="kw">lambda</span> x: option_match(<span class="vs">r&#39;\s*(\S*)&#39;</span>, x))
+    .bind(<span class="kw">lambda</span> x: option_get_group(x, <span class="dv">1</span>))
+    .bind(option_int))</code></pre></div>
+<p>This code opens a text file, reads the entire file from it, looks at the first word in the file, and tries to read it in as an integer. Using the Option Monad is useful because if an error happens at any time during the computation, it just passes a Nothing Option through the rest of the bind functions.</p>
 <p>We can make this look cooler by choosing an infix operator to overload. By convention, <code>&gt;&gt;=</code> is used, but that's hard to to do in python, so we are going to use <code>&gt;&gt;</code>. We can override that operator in python with the following code:</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">def</span> <span class="fu">__rshift__</span>(<span class="va">self</span>, function):
     <span class="cf">return</span> <span class="va">self</span>.bind(function)</code></pre></div>
-<p>This code let's us rewrite the above option code as the following.</p>
+<p>Now, let's rewrite the above option code as the following.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">result <span class="op">=</span> (
     Option.some(<span class="st">&#39;text.txt&#39;</span>)
       <span class="op">&gt;&gt;</span> option_open
@@ -265,148 +265,93 @@
       <span class="op">&gt;&gt;</span> (<span class="kw">lambda</span> x: option_get_group(x, <span class="dv">1</span>))
       <span class="op">&gt;&gt;</span> option_int
     )</code></pre></div>
-<h2 id="the-result-monad"><span class="header-section-number">2.7</span> The Result Monad</h2>
-<p>There is one downside to the Option Monad as far as we've discussed it. When the above code is run, you can't tell where or why an error occurs; no matter where the error occurs, you just end up with an inscrutable None.</p>
-<p>Luckily, these is a simple modification to the Option Monad that makes is able to convey error messages. Some languages call this the Result Monad. I'm not going to go in depth as to how it works, because it's very similar to the Option Monad. I will, however, highlight one function from below.</p>
+<p>Consider the same operation in regular Python. We can write it in one expression, in which case this is impossible to read, or we can split it up, over many lines, creating a bunch of temporary variables that we use once and then never again.</p>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="co"># one expression</span>
+result <span class="op">=</span> <span class="bu">int</span>(
+        re.match(
+            <span class="vs">r&#39;\s*(\S*)&#39;</span>,
+            <span class="bu">open</span>(<span class="st">&#39;text.txt&#39;</span>).read()
+        ).group(<span class="dv">1</span>)
+    )
+
+<span class="co"># with temporary variables</span>
+temp1 <span class="op">=</span> <span class="bu">open</span>(<span class="st">&#39;text.txt&#39;</span>).read()
+temp2 <span class="op">=</span> re.match(<span class="vs">r&#39;\s*(\S*)&#39;</span>, temp1).group(<span class="dv">1</span>)
+result <span class="op">=</span> <span class="bu">int</span>(temp2)</code></pre></div>
+<p>The first example is unreadable. The functions used have no meaningful order, so it becomes an act of mental gymnastics to figure out what happens when. The second example is the shortest version where all the functions appear in the source code in the order they are called, and so it is pretty readable, but once again we've got the problem of errors!</p>
+<p>This code could blow up if the wrong information is passed into it, and it can blow up in approximately 5 places. Even worse, because <code>.group()</code> can return <code>None</code> if it fails, and <code>int(None) == 0</code>, you can get a wrong answer from this code without an error being thrown. In order to guarantee that this code doesn't fail, this is the sort of code you would need to write in Python.</p>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="cf">try</span>:
+    temp1 <span class="op">=</span> <span class="bu">open</span>(<span class="st">&#39;text.txt&#39;</span>).read()
+    temp2 <span class="op">=</span> re.match(<span class="vs">r&#39;\s*(\S*)&#39;</span>, temp1).group(<span class="dv">1</span>)
+    <span class="cf">if</span> temp2 <span class="op">==</span> <span class="va">None</span>:
+        result <span class="op">=</span> <span class="va">None</span>
+    <span class="cf">else</span>:
+        result <span class="op">=</span> <span class="bu">int</span>(temp2)
+<span class="cf">except</span> <span class="pp">Exception</span>:
+    result <span class="op">=</span> <span class="va">None</span></code></pre></div>
+<p>The above code now won't throw any errors or produce erroneous results, and will set <code>result</code> to <code>None</code> if the code fails. Now, compare that safe version without Monads to the version that is safe with Monads.</p>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">result <span class="op">=</span> (
+    Option.some(<span class="st">&#39;text.txt&#39;</span>)
+      <span class="op">&gt;&gt;</span> option_open
+      <span class="op">&gt;&gt;</span> option_read
+      <span class="op">&gt;&gt;</span> (<span class="kw">lambda</span> x: option_match(<span class="vs">r&#39;\s*(\S*)&#39;</span>, x))
+      <span class="op">&gt;&gt;</span> (<span class="kw">lambda</span> x: option_get_group(x, <span class="dv">1</span>))
+      <span class="op">&gt;&gt;</span> option_int
+    )</code></pre></div>
+<p>The Monad version is simpler, just as safe, and even a line shorter (two if you don't count the line with a single close parenthesis). Not to mention cooler by far.</p>
+<h2 id="the-result-monad"><span class="header-section-number">2.5</span> The Result Monad</h2>
+<p>There is one major problem with the Option monad above; if our code fails, we have no way to know how or when. With the standard python example, we could print an error message to the screen or to a file that would let us know what kind of error occurred. There is another Monad, called the Result Monad, that allows us to do that while still having the power of the Option Monad. I won't reproduce the entire code here (it is in the appendix) but I will go over a few of the changes, as we will use the Result Monad in the next section.</p>
+<p>The Result Monad uses slightly different names; a value is Ok if it is a successful computation, and it is an Error if it has failed. The functions to check this status are <code>self.is_ok()</code> and <code>self.is_error()</code>.</p>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, failed, value, message):
+        <span class="va">self</span>._failed <span class="op">=</span> failed
+        <span class="va">self</span>._message <span class="op">=</span> message
+        <span class="va">self</span>._value <span class="op">=</span> value</code></pre></div>
+<p>Our <code>__init__</code> function now takes an additional argument; an error message. Now, we have a value that indicates whether or not our computation has failed, a value that stores the result of the computation (if the computation succeeded), and a value that stores the error message (if the computation failed).</p>
+<p>In order to access the error message, we add a new function like <code>unwrap</code>.</p>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="kw">def</span> error_msg(<span class="va">self</span>):
+        <span class="cf">if</span> <span class="va">self</span>.is_error():
+            <span class="cf">return</span> <span class="va">self</span>._message
+        <span class="cf">else</span>:
+            <span class="cf">raise</span> <span class="pp">Exception</span>(<span class="st">&#39;This Result is Ok&#39;</span>)</code></pre></div>
+<p>This function checks whether or not we have failed, and returns the error message if it is an Error. Just like <code>unwrap</code>, it throws an Exception if there is no error message.</p>
+<p><code>bind</code> has not changed at all, but it is nice to note that when you return <code>self</code> in the case of the error, the error message stays the same.</p>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="kw">def</span> bind(<span class="va">self</span>, function):
+        <span class="cf">if</span> <span class="va">self</span>.is_error():
+            <span class="cf">return</span> <span class="va">self</span>
+        
+        val <span class="op">=</span> <span class="va">self</span>.unwrap()
+        <span class="cf">return</span> function(val)</code></pre></div>
+<p>I'm also adding another function that is sort of like <code>bind</code>, but instead, provides a simple way for Monadic computations to check for errors, and if they've occurred, to replace the computed value with a default value.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="kw">def</span> recover(<span class="va">self</span>, function):
         <span class="cf">if</span> <span class="va">self</span>.is_error():
             <span class="cf">return</span> function()
         
         <span class="cf">return</span> <span class="va">self</span></code></pre></div>
-<p>The <code>recover</code> function is the opposite of <code>bind</code>; if the result is a failure, it will attempt to recover computation by replacing the current Result Monad with the result of whatever function is passed in. If the result is a success, however, it leaves the value alone.</p>
-<p>Here is the full source code for the Result Monad; I do recommend familiarizing yourself with it before we move on.</p>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">class</span> ResultException(<span class="pp">Exception</span>):
-    <span class="cf">pass</span>
-
-<span class="kw">class</span> Result:
-    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, failed, value, message):
-        <span class="va">self</span>._failed <span class="op">=</span> failed
-        <span class="va">self</span>._message <span class="op">=</span> message
-        <span class="va">self</span>._value <span class="op">=</span> value
-
-    <span class="kw">def</span> <span class="fu">__repr__</span>(<span class="va">self</span>):
-        <span class="cf">if</span> <span class="va">self</span>._failed:
-            <span class="cf">return</span> <span class="st">&#39;Option.error({})&#39;</span>.<span class="bu">format</span>(<span class="bu">repr</span>(<span class="va">self</span>._message))
-        <span class="cf">else</span>:
-            <span class="cf">return</span> <span class="st">&#39;Option.ok({})&#39;</span>.<span class="bu">format</span>(<span class="bu">repr</span>(<span class="va">self</span>._value))
-
-    <span class="kw">def</span> <span class="fu">__str__</span>(<span class="va">self</span>):
-        <span class="cf">if</span> <span class="va">self</span>._failed:
-            <span class="cf">return</span> <span class="st">&#39;Error({})&#39;</span>.<span class="bu">format</span>(<span class="va">self</span>._message)
-        <span class="cf">else</span>:
-            <span class="cf">return</span> <span class="st">&#39;Ok({})&#39;</span>.<span class="bu">format</span>(<span class="va">self</span>._value)
-
-    <span class="kw">def</span> is_ok(<span class="va">self</span>):
-        <span class="cf">if</span> <span class="va">self</span>._failed:
-            <span class="cf">return</span> <span class="va">False</span>
-        <span class="cf">return</span> <span class="va">True</span>
-
-    <span class="kw">def</span> is_error(<span class="va">self</span>):
-        <span class="cf">return</span> <span class="op">not</span> <span class="va">self</span>.is_ok()
-    
-    <span class="kw">def</span> unwrap(<span class="va">self</span>):
-        <span class="cf">if</span> <span class="va">self</span>.is_ok():
-            <span class="cf">return</span> <span class="va">self</span>._value
-        <span class="cf">else</span>:
-            <span class="cf">raise</span> ResultException(<span class="st">&#39;This Result is an Error&#39;</span>)
-    
-    <span class="kw">def</span> error_msg(<span class="va">self</span>):
-        <span class="cf">if</span> <span class="va">self</span>.is_error():
-            <span class="cf">return</span> <span class="va">self</span>._message
-        <span class="cf">else</span>:
-            <span class="cf">raise</span> ResultException(<span class="st">&#39;This Result is Ok&#39;</span>)
-            
-    <span class="kw">def</span> bind(<span class="va">self</span>, function):
-        <span class="cf">if</span> <span class="va">self</span>.is_error():
-            <span class="cf">return</span> <span class="va">self</span>
-        
-        val <span class="op">=</span> <span class="va">self</span>.unwrap()
-        <span class="cf">return</span> function(val)
-    
-    <span class="kw">def</span> recover(<span class="va">self</span>, function):
-        <span class="cf">if</span> <span class="va">self</span>.is_error():
-            <span class="cf">return</span> function()
-        
-        <span class="cf">return</span> <span class="va">self</span>
-    
-    <span class="kw">def</span> <span class="fu">__rshift__</span>(<span class="va">self</span>, function):
-        <span class="cf">return</span> <span class="va">self</span>.bind(function)
-
-    <span class="at">@classmethod</span>
+<p>This function allows you to perform an operation like getting a value from a configuration file, but using a default value if it fails, with Monads. The following snippet, for example, uses results to open, read, and parse some number from a file, and then it checks whether the operation failed at any level, and uses the value of <code>10</code> if it failed.</p>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">config <span class="op">=</span> (
+    result_open(<span class="st">&#39;config.txt&#39;</span>)
+      <span class="op">&gt;&gt;</span> result_read
+      <span class="op">&gt;&gt;</span> result_parse
+    ).recover(<span class="kw">lambda</span>: Result.ok(<span class="dv">10</span>))</code></pre></div>
+<p>The equivalent in plain Python would be the following.</p>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="cf">try</span>:
+    temp1 <span class="op">=</span> <span class="bu">open</span>(<span class="st">&#39;config.txt&#39;</span>)
+    temp2 <span class="op">=</span> temp1.read()
+    config <span class="op">=</span> parse(temp2)
+<span class="cf">except</span> <span class="pp">Exception</span>:
+    config <span class="op">=</span> <span class="dv">10</span></code></pre></div>
+<p>We've already seen these used above, but for completeness here are the two constructors for the Result Monad.</p>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="at">@classmethod</span>
     <span class="kw">def</span> ok(cls, val):
         <span class="cf">return</span> cls(<span class="va">False</span>, val, <span class="va">None</span>)
     
     <span class="at">@classmethod</span>
     <span class="kw">def</span> error(cls, msg):
-        <span class="cf">return</span> cls(<span class="va">True</span>, <span class="va">None</span>, msg)
-
-<span class="co"># The following are built in functions</span>
-<span class="co"># rewritten to work with the Result Monad</span>
-
-<span class="kw">def</span> result_open(filename, mode<span class="op">=</span><span class="st">&#39;r&#39;</span>):
-    <span class="cf">try</span>:
-        fd <span class="op">=</span> Result.ok(<span class="bu">open</span>(filename, mode<span class="op">=</span>mode))
-    <span class="cf">except</span> <span class="pp">Exception</span>:
-        fd <span class="op">=</span> Result.error(<span class="st">&quot;Failed to open the file&quot;</span>)
-    <span class="cf">return</span> fd
-
-<span class="kw">def</span> result_read(fd, size<span class="op">=-</span><span class="dv">1</span>):
-    <span class="cf">try</span>:
-        data <span class="op">=</span> Result.ok(fd.read(size))
-    <span class="cf">except</span> <span class="pp">Exception</span>:
-        data <span class="op">=</span> Result.error(<span class="st">&quot;Failed to read from the file&quot;</span>)
-    <span class="cf">return</span> data
-
-<span class="im">import</span> re
-
-<span class="kw">def</span> result_match(pattern, string):
-    match <span class="op">=</span> re.match(pattern, string)
-    <span class="cf">if</span> match:
-        match <span class="op">=</span> Result.ok(match)
-    <span class="cf">else</span>:
-        match <span class="op">=</span> Result.error(<span class="st">&quot;Failed to match the pattern&quot;</span>)
-    <span class="cf">return</span> match
-
-<span class="kw">def</span> result_get_group(match, group):
-    <span class="cf">try</span>:
-        g <span class="op">=</span> match.group(group)
-    <span class="cf">except</span> <span class="pp">Exception</span>:
-        g <span class="op">=</span> <span class="va">None</span>
-
-    <span class="cf">if</span> g <span class="op">==</span> <span class="va">None</span>:
-        g <span class="op">=</span> Result.error(<span class="st">&quot;Failed to get the group from the match&quot;</span>)
-    <span class="cf">else</span>:
-        g <span class="op">=</span> Result.ok(g)
-        
-    <span class="cf">return</span> g
-
-<span class="kw">def</span> result_int(s):
-    <span class="cf">try</span>:
-        i <span class="op">=</span> Result.ok(<span class="bu">int</span>(s))
-    <span class="cf">except</span> <span class="pp">Exception</span>:
-        i <span class="op">=</span> Result.error(<span class="st">&quot;Failed to parse into an integer&quot;</span>)
-    <span class="cf">return</span> i
-
-
-result <span class="op">=</span> (
-    Result.ok(<span class="st">&#39;text.txt&#39;</span>)
-      <span class="op">&gt;&gt;</span> result_open
-      <span class="op">&gt;&gt;</span> result_read
-      <span class="op">&gt;&gt;</span> (<span class="kw">lambda</span> x: result_match(<span class="vs">r&#39;\s*(\S*)&#39;</span>, x))
-      <span class="op">&gt;&gt;</span> (<span class="kw">lambda</span> x: result_get_group(x, <span class="dv">1</span>))
-      <span class="op">&gt;&gt;</span> result_int
-    )
-
-<span class="bu">print</span>(result)</code></pre></div>
-<h2 id="either-monad"><span class="header-section-number">2.8</span> Either Monad</h2>
-<p>Another common Monad that is not worth writing in python but invaluable in some other languages, and is in fact a more general form of the Result Monad, is the Either Monad. An Either Monad is really useful in strictly typed languages, because it can be returned from a function that can return two possible types.</p>
-<p>I'm not going to implement this in python, because this is mostly useless for a python program, but it's essentially identical to the Result Monad implementation. Try it out!</p>
+        <span class="cf">return</span> cls(<span class="va">True</span>, <span class="va">None</span>, msg)</code></pre></div>
 <h1 id="a-parsing-monad"><span class="header-section-number">3</span> A Parsing Monad</h1>
-<p>This is our first look into a complex and powerful Monad that represents a very useful computer science tool. We are going to use a Monad called the Parsing Combinator, which basically recreates and improves upon regex using Monads. Here we see the truth of the oft said but little understood aphorism that Monads represent computation; here, they represent the computation of regular expressions.</p>
-<p>It's also worth noting that there are many python Parsing Combinator libraries on the python package index, so if you want to use this for real, find one of them, and not mine; theirs is better written, faster, and provides more functionality.</p>
+<p>We're now going to talk about a Monad called the Parsing Combinator, which basically recreates and improves upon regular expressions using Monads. Here we see the truth of the oft said but little understood aphorism that Monads represent computation; here, they represent the computation of regular expressions.</p>
+<p>It's also worth noting that there are many python Parsing Combinator libraries on the python package index, and those will have faster, more powerful implementations than the one below.</p>
 <h2 id="the-code"><span class="header-section-number">3.1</span> The Code</h2>
-<p>First of all, I am going to use the above Result Monad to help me implement this Parsing Combinator. Even though the parsing itself is Monadic, it has to return a result that can either be a success or a failure; so the Result Monad is going to be useful.</p>
-<p>With that said, let's step through the code for our Parsing Combinator.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">class</span> Parser:
     <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, function):
         <span class="va">self</span>._function <span class="op">=</span> function
@@ -557,7 +502,7 @@ match_a.<span class="bu">tuple</span>(match_b)</code></pre></div>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="kw">def</span> optional(<span class="va">self</span>):
         <span class="cf">return</span> <span class="va">self</span>.choice(Parser.empty())</code></pre></div>
 <p>Finally, <code>optional</code> tries to match the input text with <code>self</code>, but if it fails, it matches nothing and finishes.</p>
-<p>Finally, we add symbolic versions of many of the above functions. This is purely for ease of reading the expressions we will write; you will see that they can get pretty complex, and we don't want to</p>
+<p>Finally, we add symbolic versions of many of the above functions. This is purely for ease of reading the expressions we will write; you will see that they can get pretty complex, and <code>this.concat(that)</code> is harder to understand at a glance than <code>this + that</code>.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="co"># |</span>
     <span class="kw">def</span> <span class="fu">__or__</span>(<span class="va">self</span>, other):
         <span class="cf">return</span> <span class="va">self</span>.choice(other)
@@ -593,7 +538,7 @@ match_a.<span class="bu">tuple</span>(match_b)</code></pre></div>
 <li><code>bind_func</code> takes the result, and passes the matched value through the function passed in to the Parser's bind function. This gives us a Result Monad, and we pull out it's value (if it exists).</li>
 <li>Then we build the new Result Monad holding <code>(matched value, remainder of text)</code>, except now the matched value is the result of <code>function</code>.</li>
 </ul>
-<p>This lets us bind functions that affect the result we get at the end of our parsing, by changing the match, but not interrupting the parsing, by changing the remainder of the text.</p>
+<p><strong><em>EXPLAIN WHAT BIND DOES AT A HIGH LEVEL</em></strong></p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="kw">def</span> fmap(<span class="va">self</span>, function):
         <span class="cf">return</span> <span class="va">self</span>.bind(<span class="kw">lambda</span> x: Result.ok(function(x)))</code></pre></div>
 <p>We're also going to introduce a new function very similar to <code>bind</code> called <code>fmap</code>. This function is the same as <code>bind</code>, but it takes a function that can't fail and uses that to modify the matched value. We could always write out <code>bind(lambda x: Result.ok(function(x)))</code> for this, but it's nice to have it packaged up in a method, because then we can bind it to a symbol.</p>
@@ -663,7 +608,6 @@ Parser.parse_total(number, <span class="st">&#39;&#39;</span>)
 
 Parser.parse_total(number, <span class="st">&#39;7.22345e10&#39;</span>) <span class="op">&gt;&gt;</span> result_float
     <span class="co"># Ok(72234500000.0)</span></code></pre></div>
-<p>One really</p>
 <h2 id="going-further"><span class="header-section-number">3.3</span> Going Further</h2>
 <p>Everything we've done so far can basically be done in the exact same way by regular expressions. However, because of the way we've defined the Parsing Combinator, we can use <code>bind</code> and <code>fmap</code> inside of Parsing Combinator expressions. This allows us to parse complex expressions into fully formed and entirely arbitrary python objects.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">number <span class="op">=</span> (sign <span class="op">+</span> digits <span class="op">+</span> decimal <span class="op">+</span> exponent) <span class="op">&gt;&gt;</span> result_float</code></pre></div>
@@ -770,148 +714,38 @@ text <span class="op">=</span> <span class="st">&#39;((1+2) * (9 - 11))&#39;</sp
 <span class="co">#     )</span>
 <span class="co"># )</span></code></pre></div>
 <h1 id="theory-of-monads"><span class="header-section-number">4</span> Theory of Monads</h1>
-<p>Now that we've seen many types of Monads, we should discuss the technical, boring discussion of what a Monad is. A Monad is, in essence, any construct, usually an object, in a language that satisfies the following criteria. I will say each criterion in two ways; a simple way, and a correct way.</p>
-<p>However, there are two ways to define Monads. The two definitions in practice lead to the exact same object, but some Monads are easier to deal with using one definition, and other Monads are easier to deal with using the other. I will start with the Monad laws that are easiest for the Option Monad.</p>
-<h2 id="the-monad-laws-with-bind"><span class="header-section-number">4.1</span> The Monad Laws with <code>bind</code></h2>
-<ul>
-<li>For any type <code>t</code>, and Monad type <code>M</code>, <code>M t</code> is the type of the Monad holding that type.
-<ul>
-<li><em>Monads can hold values</em></li>
-</ul></li>
-<li>There is a function called 'unit' or 'return' that has type <code>t -&gt; M t</code> which injects a value of type <code>t</code> into a Monad of type <code>M t</code> in some simple way.
-<ul>
-<li><em>There is a function to create Monads from regular values</em></li>
-</ul></li>
-<li>There is a binding operation of type <code>M t -&gt; (t -&gt; M u) -&gt; M u</code> which maps the value of a Monad of type <code>M t</code> into another Monad of type <code>M u</code> by using a function that maps a value of type <code>t</code> into a Monad of type <code>M u</code>
-<ul>
-<li><em>There is a bind function, as discussed earlier</em></li>
-</ul></li>
-</ul>
-<p>These above laws also have to follow a set of rules that determines how the above functions can be combined. These rules are super simple; basically they just exist to make sure that the bind function and the constructor don't do anything funky.</p>
-<ul>
-<li>The unit function acts as a neutral element of bind
-<ul>
-<li><em>Calling bind on the unit function (or constructor) doesn't do anything</em></li>
-</ul></li>
-</ul>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">            Option.some(<span class="dv">5</span>).bind(Option.some) <span class="op">==</span> Option.some(<span class="dv">5</span>)</code></pre></div>
-<ul>
-<li>Binding two functions in series is the same as binding the result of composing those two functions
-<ul>
-<li><em>You don't have to worry about binding doing weird things to your values; an example is really useful here</em></li>
-</ul></li>
-</ul>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">            <span class="kw">def</span> one_over(x):
-                <span class="cf">if</span> x <span class="op">==</span> <span class="dv">0</span>:
-                     <span class="cf">return</span> Option.none()
-                <span class="cf">return</span> Option.some(<span class="dv">1</span><span class="op">/</span>x)
+<p>Now that we've seen a few examples of what a Monad is, we can talk about the formal definition. This is going to be the most abstract section of the text, but I'll try and keep any statements from category theory or abstract algebra from appearing here.</p>
+<h2 id="defining-monads"><span class="header-section-number">4.1</span> Defining Monads</h2>
+<p>Monads are a special type of object that contains with in it a value and a context. Our Option and Result Monads contained the result of a computation, along with contextual information regarding whether the operation had succeeded or failed. This allowed us to write programs that could detect failure elegantly. Our Parsing Monad contained the result of the parsing so far, as well as the rest of the text remaining to be parsed. Whenever you see a Monad, you can sum up its operation by asking &quot;What is the value in this Monad, and what is the context?&quot;. Many people, when confronted with Monads, want a way to get the value out of the Monad. But this causes problems, because you've taken the value out of context, and it becomes significantly more useless.</p>
+<p>In order to interact with the values without taking them out of their context, we have a function called <code>fmap</code>. <code>fmap</code> takes the value, and applies the function to that value, and puts the result of he function back into context. In our Option and Result Monads, it applied the function to the value if our computation was successful, or it simply bypassed the function if our computation had failed. In our parsing combinator, it applied the function to the result of our computation, while leaving the remainder of the text to be parsed alone.</p>
+<p>However, this meant that we couldn't use functions on the values in our Monad if the functions themselves returned Monads. For our Option and Result Monads, that means that we couldn't use a function that could fail (a function that returned an Option or Result Monad) on our Monad with <code>fmap</code>. If we did that, we could end up with a recursive Monad, like <code>Some(None)</code> or <code>Some(Some(3))</code>. This is annoying, and there's two ways to fix this weirdness.</p>
+<p>The first way, which we used in the previous section, is to use a function called <code>bind</code>. <code>bind</code> is the same as <code>fmap</code>, but instead of putting the return value of the function passed to <code>bind</code> back into the same context, it expects that <code>bind</code> will return a new value and context (a Monad of some kind).</p>
+<p>The second way is an alternative to <code>bind</code>; you don't need both, and it's more common to have <code>bind</code> as the one to use, so I haven't bothered talking about it yet. This function is called <code>join</code>, and it takes a recursive Monad and flattens it from two layers to one layer. For example:</p>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">Option.some(Option.some(x)).join() <span class="op">==</span> Option.some(x)
+Option.some(Option.none()).join() <span class="op">==</span> Option.none()
+Option.none().join() <span class="op">==</span> Option.none()</code></pre></div>
+<p>We can show that <code>join</code> isn't any less useful than <code>bind</code> by actually writing <code>bind</code> using only <code>join</code> and <code>fmap</code>.</p>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">def</span> bind(monad, function):
+    <span class="cf">return</span> monad.fmap(function).join()</code></pre></div>
+<p>This does the same thing as <code>bind</code> usually does; it applies the function to the inside value if the Monad isn't Nothing, and then it returns Nothing if either the function returns or the Monad is Nothing, or it returns Some(value) if the function succeeds and the Monad had a value to pass into the function.</p>
+<p>We can also show a way to write <code>fmap</code> and <code>join</code> solely using <code>bind</code>:</p>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">def</span> fmap(monad, function):
+    monad.bind(<span class="kw">lambda</span> x: Option.some(function(x)))
 
-            <span class="kw">def</span> two_over(x):
-                <span class="cf">if</span> x <span class="op">==</span> <span class="dv">0</span>:
-                    <span class="cf">return</span> Option.none()
-                <span class="cf">return</span> Option.some(<span class="dv">2</span><span class="op">/</span>x)
-
-            Option.some(<span class="dv">5</span>).bind(one_over).bind(two_over) <span class="op">==</span> <span class="op">\</span>
-            Option.some(<span class="dv">5</span>).bind(<span class="kw">lambda</span> x: one_over(x).bind(two_over))</code></pre></div>
-<h2 id="fmap-and-join"><span class="header-section-number">4.2</span> <code>fmap</code> and <code>join</code></h2>
-<p>If you want, you can replace the bind function with two slightly different functions, and you get the same exact system. These two functions are called <code>fmap</code> and <code>join</code>. Below, I'll implement them for the Option Monad.</p>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="kw">def</span> fmap(<span class="va">self</span>, function):
-        <span class="cf">if</span> <span class="va">self</span>.is_none():
-            <span class="cf">return</span> <span class="va">self</span>
-        val <span class="op">=</span> <span class="va">self</span>.unwrap()
-        <span class="cf">return</span> Option.some(function(val))
-
-    <span class="kw">def</span> join(<span class="va">self</span>):
-        <span class="cf">if</span> <span class="va">self</span>.is_none():
-            <span class="cf">return</span> <span class="va">self</span>
-        val <span class="op">=</span> <span class="va">self</span>.unwrap()
-        <span class="cf">return</span> val</code></pre></div>
-<p><code>fmap</code> is the simpler of the two. <code>fmap</code> applies a function to the Option's value, if it has one. The difference between <code>fmap</code> and <code>bind</code> is that <code>fmap</code> assumes that it's function will always succeed, and therefore doesn't need to return an Option Monad. We have already seen <code>fmap</code>, with the Parsing Combinator, but we haven't really given it it's full introduction until now.</p>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">def</span> plus_one(x):
-    <span class="cf">return</span> x <span class="op">+</span> <span class="dv">1</span>
-
-Option.some(<span class="dv">5</span>).fmap(plus_one)</code></pre></div>
-<p>In the above example, we can't use <code>bind</code>, because <code>plus_one</code> doesn't return an Option Monad, so it would break our chain of <code>bind</code> commands. However, <code>fmap</code> can be used instead. But <code>fmap</code> can't be a replacement for <code>bind</code> all on it's own.</p>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">def</span> one_over(x):
-    <span class="cf">if</span> x <span class="op">==</span> <span class="dv">0</span>:
-         <span class="cf">return</span> Option.none()
-    <span class="cf">return</span> Option.some(<span class="dv">1</span><span class="op">/</span>x)
-
-Option.some(<span class="dv">5</span>).fmap(one_over) <span class="op">==</span> Option.some(Option.some(<span class="fl">0.2</span>))
-Option.some(<span class="dv">0</span>).fmap(one_over) <span class="op">==</span> Option.some(Option.none())</code></pre></div>
-<p>In the above example, <code>fmap</code> adds an additional layer of the Option Monad. This is where <code>join</code> comes in. <code>join</code> collapses two layers of a Monad into one layer.</p>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">Option.some(<span class="dv">5</span>).fmap(one_over).join() <span class="op">==</span> Option.some(<span class="fl">0.2</span>)
-Option.some(<span class="dv">0</span>).fmap(one_over).join() <span class="op">==</span> Option.none()
-Option.none().fmap(one_over).join() <span class="op">==</span> Option.none()</code></pre></div>
-<p>As a matter of practice, most Monads will implement all three; <code>bind</code>, <code>fmap</code>, and <code>join</code>. Annoyingly, different languages and libraries name these functions different things, but they're probably there under different names.</p>
-<p>A simple proof that it doesn't matter if you use <code>bind</code> or <code>fmap</code> and <code>join</code> is to simply use one set to implement the other. In the following code, I will do that for the Result monad.</p>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="co"># bind implemented for a monad that only has fmap and join</span>
-<span class="kw">def</span> bind(result, function):
-    <span class="cf">return</span> result.fmap(function).join()
-
-<span class="co"># fmap and join implemented for a monad that only has bind</span>
-<span class="kw">def</span> fmap(result, function):
-    always_works <span class="op">=</span> <span class="kw">lambda</span> x: Result.ok(function(x))
-    <span class="cf">return</span> result.bind(always_works)
-
-<span class="kw">def</span> join(result):
-    returns_self: <span class="kw">lambda</span> x: x
-    <span class="cf">return</span> result.bind(returns_self)</code></pre></div>
-<p>In the above code, we can see that <code>bind</code> is defined by first <code>fmap</code>ing the function over the Monad, producing something like <code>Result.ok(Result.ok(3))</code>, and then joining those two layers into one; the same behavior that <code>bind</code> usually has.</p>
-<p><code>fmap</code> is defined by simply creating a version of the function that works with <code>bind</code>; since <code>fmap</code> is supposed to take a function that doesn't return a Monad, and thus always succeeds, we can just wrap the result of that in a <code>Result.ok()</code></p>
-<p><code>join</code> is super simple; <code>join</code> is supposed to collapse two layers of Monads into one. We can do this by simply <code>bind</code>ing a function that simply returns itself; this will be passed the inner layer of the nested Monad, and return that as the new Monad.</p>
-<h2 id="the-monad-laws-with-fmap-and-join"><span class="header-section-number">4.3</span> The Monad Laws with <code>fmap</code> and <code>join</code></h2>
-<p>A lot of these laws are the exact same.</p>
-<ul>
-<li>For any type <code>t</code>, and Monad type <code>M</code>, <code>M t</code> is the type of the Monad holding that type.
-<ul>
-<li><em>Monads can hold values</em></li>
-</ul></li>
-<li>There is a function called 'unit' or 'return' that has type <code>t -&gt; M t</code> which injects a value of type <code>t</code> into a Monad of type <code>M t</code> in some simple way.
-<ul>
-<li><em>There is a function to create Monads from regular values</em></li>
-</ul></li>
-<li>There is a mapping operation of type <code>M t -&gt; (t -&gt; u) -&gt; M u</code> which maps the value of a Monad of type <code>M t</code> into another Monad of type <code>M u</code> by using a function that maps a value of type <code>t</code> into a Monad of type <code>M u</code>
-<ul>
-<li><em>There is an fmap function, as discussed earlier</em></li>
-</ul></li>
-<li>There is a mapping operation of type <code>M M t -&gt;  M t</code> which
-<ul>
-<li><em>There is an fmap function, as discussed earlier</em></li>
-</ul></li>
-</ul>
-<p>These above laws also have to follow a set of rules that determines how the above functions can be combined. These rules are very similar to the <code>bind</code> rules.</p>
-<ul>
-<li>The identity function acts as the neutral element of fmap
-<ul>
-<li><em>Calling fmap on the function f(x) = x doesn't do anything</em></li>
-</ul></li>
-</ul>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">            Option.some(<span class="dv">5</span>).fmap(<span class="kw">lambda</span> x: x) <span class="op">==</span> Option.some(<span class="dv">5</span>)</code></pre></div>
-<ul>
-<li>The unit function acts as the neutral element of the composition of fmap and join.
-<ul>
-<li><em>Join doesn't do anything weird to values.</em></li>
-</ul></li>
-</ul>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">            Option.some(<span class="dv">5</span>).fmap(Option.some).join() <span class="op">==</span> Option.some(<span class="dv">5</span>)</code></pre></div>
-<p> </p>
-<ul>
-<li>Fmapping two functions in series is the same as Fmapping the result of composing those two functions.
-<ul>
-<li><em>You don't have to worry about fmapping doing weird things to your values; an example is really useful here</em></li>
-</ul></li>
-</ul>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">            <span class="kw">def</span> plus_one(x):
-                <span class="cf">return</span> x <span class="op">+</span> <span class="dv">1</span>
-
-            <span class="kw">def</span> plus_two(x):
-                <span class="cf">return</span> x <span class="op">+</span> <span class="dv">2</span>
-
-            Option.some(<span class="dv">5</span>).fmap(plus_one).fmap(plus_two) <span class="op">==</span> Option.some(<span class="dv">5</span>) <span class="op">\</span>
-                .bind(<span class="kw">lambda</span> x: plus_two(plus_one(x)))</code></pre></div>
+<span class="kw">def</span> join(monad):
+    monad.bind(<span class="kw">lambda</span> x: x.unwrap() <span class="cf">if</span> x.is_some() <span class="cf">else</span> x)</code></pre></div>
+<p>This means, for our purposes, for something to be a Monad, we require it to either have both <code>fmap</code> and <code>join</code> <em>or</em> <code>bind</code>.</p>
+<h2 id="monad-laws"><span class="header-section-number">4.2</span> Monad Laws</h2>
+<p>Now, Monads usually have a bunch of laws or rules they have to follow; this is just to make sure Monads don't have any unexpected behavior, but we should go over those rules anyway.</p>
+<p>First of all, if you <code>fmap</code> over a Monad with the identity function (a function that returns its inputs unchanged), the value in the Monad doesn't change.</p>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">Monad(x).fmap(<span class="kw">lambda</span> x: x) <span class="op">==</span> Monad(x)</code></pre></div>
+<p>Secondly, if you <code>fmap</code> two functions in a row, it should be the same as simply <code>fmap</code>ing the function which does the equivalent of those two functions in order.</p>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">m.fmap(<span class="kw">lambda</span> x: x<span class="dv">+1</span>).fmap(<span class="kw">lambda</span> x: x<span class="dv">+2</span>) <span class="op">==</span> m.fmap(<span class="kw">lambda</span> x: x<span class="dv">+3</span>)</code></pre></div>
+<p>Finally, if you apply a function to a value and then stick it in a Monad, it is the same as putting that value in a Monad and<code>fmap</code>ing that function.</p>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">Monad(x).fmap(f) <span class="op">==</span> Monad(f(x))</code></pre></div>
+<p>These might seem common sense, and if they are, that's good! The only reason that we require that these rules are followed is so that somebody doesn't create a Monad that behaves weirdly and it screws up our program. If they don't seem common sense, that's okay; you don't really have to understand them.They basically boil down to &quot;Monads should behave sensibly when you fmap functions over them&quot;.</p>
 <h1 id="the-zeroth-monad"><span class="header-section-number">5</span> The Zeroth Monad</h1>
-<p>Our first section was titled 'Our First Monad'. However, we are computer scientists, and therefore we start counting at zero, not at one. So let's talk about another Monad that everyone reading this document has probably used, but never noticed that it was a Monad. A list.</p>
+<p>Our first section was titled 'Our First Monad'. However, we are computer scientists, and therefore we start counting at zero, not at one. So let's talk about another Monad that everyone reading this document has probably used, but never noticed that it was a Monad. It turns out that a list is a Monad.</p>
 <p>How is a list a Monad? Well, from the previous section, a Monad is really just anything with a <code>bind</code> function, or with a <code>fmap</code> and a <code>join</code> function. And while not every programming language has these functions built in, we can easily write these functions for a list.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="co"># python has a built in function, &#39;map&#39; that does this.</span>
 <span class="kw">def</span> fmap(ls, function):
@@ -962,3 +796,126 @@ bind(
 )
 <span class="co"># [0.0, 1.0, -1.0, 1.4142135623730951, -1.4142135623730951]</span></code></pre></div>
 <p>In this case, we execute two functions in series, getting all of the valid results to our question in one list; but the number of results isn't the same for all inputs, so we need a Monad to represent this computational uncertainty.</p>
+
+<p></p>
+<h1 id="code-the-result-monad"><span class="header-section-number">6</span> Code: The Result Monad</h1>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">class</span> Result:
+    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, failed, value, message):
+        <span class="va">self</span>._failed <span class="op">=</span> failed
+        <span class="va">self</span>._message <span class="op">=</span> message
+        <span class="va">self</span>._value <span class="op">=</span> value
+
+    <span class="kw">def</span> <span class="fu">__repr__</span>(<span class="va">self</span>):
+        <span class="cf">if</span> <span class="va">self</span>._failed:
+            <span class="cf">return</span> <span class="st">&#39;Option.error({})&#39;</span>.<span class="bu">format</span>(<span class="bu">repr</span>(<span class="va">self</span>._message))
+        <span class="cf">else</span>:
+            <span class="cf">return</span> <span class="st">&#39;Option.ok({})&#39;</span>.<span class="bu">format</span>(<span class="bu">repr</span>(<span class="va">self</span>._value))
+
+    <span class="kw">def</span> <span class="fu">__str__</span>(<span class="va">self</span>):
+        <span class="cf">if</span> <span class="va">self</span>._failed:
+            <span class="cf">return</span> <span class="st">&#39;Error({})&#39;</span>.<span class="bu">format</span>(<span class="va">self</span>._message)
+        <span class="cf">else</span>:
+            <span class="cf">return</span> <span class="st">&#39;Ok({})&#39;</span>.<span class="bu">format</span>(<span class="va">self</span>._value)
+
+    <span class="kw">def</span> is_ok(<span class="va">self</span>):
+        <span class="cf">if</span> <span class="va">self</span>._failed:
+            <span class="cf">return</span> <span class="va">False</span>
+        <span class="cf">return</span> <span class="va">True</span>
+
+    <span class="kw">def</span> is_error(<span class="va">self</span>):
+        <span class="cf">return</span> <span class="op">not</span> <span class="va">self</span>.is_ok()
+    
+    <span class="kw">def</span> unwrap(<span class="va">self</span>):
+        <span class="cf">if</span> <span class="va">self</span>.is_ok():
+            <span class="cf">return</span> <span class="va">self</span>._value
+        <span class="cf">else</span>:
+            <span class="cf">raise</span> <span class="pp">Exception</span>(<span class="st">&#39;This Result is an Error&#39;</span>)
+    
+    <span class="kw">def</span> error_msg(<span class="va">self</span>):
+        <span class="cf">if</span> <span class="va">self</span>.is_error():
+            <span class="cf">return</span> <span class="va">self</span>._message
+        <span class="cf">else</span>:
+            <span class="cf">raise</span> <span class="pp">Exception</span>(<span class="st">&#39;This Result is Ok&#39;</span>)
+            
+    <span class="kw">def</span> bind(<span class="va">self</span>, function):
+        <span class="cf">if</span> <span class="va">self</span>.is_error():
+            <span class="cf">return</span> <span class="va">self</span>
+        
+        val <span class="op">=</span> <span class="va">self</span>.unwrap()
+        <span class="cf">return</span> function(val)
+    
+    <span class="kw">def</span> recover(<span class="va">self</span>, function):
+        <span class="cf">if</span> <span class="va">self</span>.is_error():
+            <span class="cf">return</span> function()
+        
+        <span class="cf">return</span> <span class="va">self</span>
+    
+    <span class="kw">def</span> <span class="fu">__rshift__</span>(<span class="va">self</span>, function):
+        <span class="cf">return</span> <span class="va">self</span>.bind(function)
+
+    <span class="at">@classmethod</span>
+    <span class="kw">def</span> ok(cls, val):
+        <span class="cf">return</span> cls(<span class="va">False</span>, val, <span class="va">None</span>)
+    
+    <span class="at">@classmethod</span>
+    <span class="kw">def</span> error(cls, msg):
+        <span class="cf">return</span> cls(<span class="va">True</span>, <span class="va">None</span>, msg)
+
+<span class="co"># The following are built in functions</span>
+<span class="co"># rewritten to work with the Result Monad</span>
+
+<span class="kw">def</span> result_open(filename, mode<span class="op">=</span><span class="st">&#39;r&#39;</span>):
+    <span class="cf">try</span>:
+        fd <span class="op">=</span> Result.ok(<span class="bu">open</span>(filename, mode<span class="op">=</span>mode))
+    <span class="cf">except</span> <span class="pp">Exception</span>:
+        fd <span class="op">=</span> Result.error(<span class="st">&quot;Failed to open the file&quot;</span>)
+    <span class="cf">return</span> fd
+
+<span class="kw">def</span> result_read(fd, size<span class="op">=-</span><span class="dv">1</span>):
+    <span class="cf">try</span>:
+        data <span class="op">=</span> Result.ok(fd.read(size))
+    <span class="cf">except</span> <span class="pp">Exception</span>:
+        data <span class="op">=</span> Result.error(<span class="st">&quot;Failed to read from the file&quot;</span>)
+    <span class="cf">return</span> data
+
+<span class="im">import</span> re
+
+<span class="kw">def</span> result_match(pattern, string):
+    match <span class="op">=</span> re.match(pattern, string)
+    <span class="cf">if</span> match:
+        match <span class="op">=</span> Result.ok(match)
+    <span class="cf">else</span>:
+        match <span class="op">=</span> Result.error(<span class="st">&quot;Failed to match the pattern&quot;</span>)
+    <span class="cf">return</span> match
+
+<span class="kw">def</span> result_get_group(match, group):
+    <span class="cf">try</span>:
+        g <span class="op">=</span> match.group(group)
+    <span class="cf">except</span> <span class="pp">Exception</span>:
+        g <span class="op">=</span> <span class="va">None</span>
+
+    <span class="cf">if</span> g <span class="op">==</span> <span class="va">None</span>:
+        g <span class="op">=</span> Result.error(<span class="st">&quot;Failed to get the group from the match&quot;</span>)
+    <span class="cf">else</span>:
+        g <span class="op">=</span> Result.ok(g)
+        
+    <span class="cf">return</span> g
+
+<span class="kw">def</span> result_int(s):
+    <span class="cf">try</span>:
+        i <span class="op">=</span> Result.ok(<span class="bu">int</span>(s))
+    <span class="cf">except</span> <span class="pp">Exception</span>:
+        i <span class="op">=</span> Result.error(<span class="st">&quot;Failed to parse into an integer&quot;</span>)
+    <span class="cf">return</span> i
+
+
+result <span class="op">=</span> (
+    Result.ok(<span class="st">&#39;text.txt&#39;</span>)
+      <span class="op">&gt;&gt;</span> result_open
+      <span class="op">&gt;&gt;</span> result_read
+      <span class="op">&gt;&gt;</span> (<span class="kw">lambda</span> x: result_match(<span class="vs">r&#39;\s*(\S*)&#39;</span>, x))
+      <span class="op">&gt;&gt;</span> (<span class="kw">lambda</span> x: result_get_group(x, <span class="dv">1</span>))
+      <span class="op">&gt;&gt;</span> result_int
+    )
+
+<span class="bu">print</span>(result)</code></pre></div>

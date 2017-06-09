@@ -13,16 +13,20 @@ I would like to take a few moments and clear up one possible misconception. Mona
 
 In this section, we'll explore a common problem surrounding how to report errors to the caller of a function.
 
-## Division
+## Error Handling in Plain Python
+
+Python usually uses Exception raising and catching to report errors that happen within code. It's a desirable feature to have in a scripting language, but it is less useful in systems languages, like C, Go, or Rust, because exceptions are expensive in terms of memory and CPU time. It's also less useful in functional languages like Haskell or Scala, which use types and abstract data structures to make code more predictable and safer, a goal which is undermined when code can throw exceptions that crash the whole program. In the following section, I'll be exploring ways to handle errors in Python without throwing exceptions and without using Monads.
+
+### Division
 
 ```python
 def division(x, y):
     return x / y
 ```
 
-Consider the above code fragment. This is a very simple function; one that is so simple it hardly deserves to exist. However, this function, despite it's simplicity, can throw an error if it's inputs are badly formed. `division(1.0,0.0)` will throw a `ZeroDivisionError: division by zero`. It's possible that we want to recover from this error gracefully; check the inputs and see if an error will occur, and return some error code instead of raising an exception.
+Consider the above code fragment. This is a very simple function; one that is so simple it hardly deserves to exist. However, if `y` is zero, this function can throw a `ZeroDevisionError`. It's possible that we want to recover from this error gracefully; check the inputs and see if an error will occur, and return some error code instead of raising an exception.
 
-However, we must decide what the error code should be. We can't choose `0.0`, because that is correctly returned by `division(0.0,1.0)`. We can't choose `-1.0`, because that is correctly returned by `division(-1.0,1.0)`. In fact, this function can return any possible floating point number, so we can't choose a floating point number as our error code. Luckily, python is dynamically typed, so we can return a float on success, but `None` on failure.
+However, we must decide what the error code should be. We can't choose `0.0`, because that is correctly returned by `division(0.0,1.0)`. We can't choose `-1.0`, because that is correctly returned by `division(-1.0,1.0)`. In fact, this function can return any possible floating point number, so we can't choose a floating point number as our error code. One solution is to return a float on success, but `None` on failure.
 
 ```python
 def division(x, y):
@@ -33,16 +37,16 @@ def division(x, y):
 
 Now we've written a function that checks whether or not division is possible, and performs division if it is, but returns an error code if it is not.
 
-## Indexing
+### Indexing
 
 ```python
 def index(ls, i):
     return ls[i]
 ```
 
-The above code is similar to the last example; it will perform an index lookup into a list, and return the item from the list if it can. If it can't, we're still left with the problem that it throws an exception. `index([1,2,3],10)` throws an `IndexError: list index out of range`. Let's try and do the same thing as above; rewrite this function so that it doesn't throw an error, but instead uses an error code to signal something has gone wrong.
+The above code is similar to the last example; it will perform an index lookup into a list, and return the item from the list if it can. If it can't, we're still left with the problem that it throws an exception if the index is out of bounds. Let's try and do the same thing as above; rewrite this function so that it doesn't throw an error, but instead uses an error code to signal something has gone wrong.
 
-Our first guess might be to have our error code be the same as above, and just return `None`. However, this isn't possible, because the code `index([None], 0)` would also return `None`, making it impossible to tell in practice if we have an error or not. In fact, python lets any value be inside of a list; there is no possible error code we can return that can't also be in the list. Luckily again, python lets us use multiple return values.
+Our first guess might be to have our error code be the same as above, and just return `None`. However, this isn't possible, because the code `index([None], 0)` would also return `None`. In fact, python lets any value be inside of a list; there is no possible error code we can return that can't also be in the list. Luckily, python lets us use multiple return values.
 
 ```python
 def index(ls, i):
@@ -61,14 +65,14 @@ else:
     print(value)
 ```
 
-## Combining The Above
+### Combining The Above
 
 ```python
 def divide_elements(ls, i1, i2):
     return ls[i1]/ls[i2]
 ```
 
-Now, we've combined the two operations in python which might lead to an exception, and we've done it in a way that allows for three different operations to result in an exception. We can use the above functions to rewrite this function so that it won't throw any errors, by checking after each step for an error code.
+Now, we've combined the two operations in python which might lead to an exception, and we've done it in a way that allows for three different operations to result in an exception. We can rewrite this function so that it won't throw any errors, by checking after each step for an error code.
 
 ```python
 def index(ls, i):
@@ -93,9 +97,11 @@ def divide_elements(ls, i1, i2):
     return division(v1, v2)
 ```
 
-This code works nicely; you can throw two types of errors at it, and it returns `None` when either error would occur. `divide_elements( [1,2,3,0],1,10)` and `divide_elements([1,2,3,0],1,3)` both return `None`, and `divide_elements([1,2,3,0],1,2)` returns `0.666666`.
+This code works nicely; you can throw two types of errors at it, and it returns `None` when either error would occur.
 
-This is nothing special so far. All we've done is rewritten a piece of code so that it doesn't throw an exception. In fact, we've probably made the code worse; python is built around dynamic types and exception throwing, so the more pythonic way of writing the above code is more like the following.
+### Other Programming Languages
+
+Python has been very nice to us so far; in Python, it is easy to write a function that returns two values, or returns different types in different scenarios. Python also has other features, such as Exceptions, which make this rewriting we've been dong sort of useless. The most Pythonic way of writing the above would probably be to catch the exceptions, writing:
 
 ```python
 def divide_elements(ls, i1, i2):
@@ -105,18 +111,17 @@ def divide_elements(ls, i1, i2):
         return None
 ```
 
-However, consider these problems in a language like C. No exceptions, no dynamic return types, and no returning multiple values. This isn't to say the problem can't be solved. C programmers have their own ways of getting around this sort of problem. But different languages have different requirements, and there are many ways to solve a problem. Next up I'm going to introduce our first Monad, a Monad that helps deal with the problem we faced above - it's not the only way, but it's an elegant way that works in statically typed languages without exceptions.
+Other languages have their own ways of dealing with the errors we discussed above, and they all have their own benefits. In C, the common pattern is to have the actual return value of the function be a number that indicates whether an error occurred, and if one did, what the error was. To get the meaningful result from the function, you pass a pointer to a block of memory into the function, and that function writes the answer you want into that block of memory. This is much faster and simpler than having to write all of the infrastructure required to deal with throwing exceptions and allowing someone above you to catch that exception.
 
-## Our First Monad
+In many modern languages, including Rust, Scala, and Haskell, the solution of choice is to use Monads.
 
-The Option Monad, also called the Maybe Monad in many programming languages, is a way of representing the result of a function, the result of any computation, that might result in an error and produce no meaningful output. We call an Option Monad that has a value and represents a successful computation Some, and we call one that doesn't have a value and represents a failed computation None.
+## The Option Monad
+
+The Option Monad, also called the Maybe Monad in many programming languages, is a way of representing the result of a function or computation that might result in an error and produce no meaningful output. We call an Option Monad that has a value and represents a successful computation Some, and we call one that doesn't have a value and represents a failed computation Nothing.
 
 These are really easy to write in programming languages like Haskell, Scala, or Rust, but I'm going to write it in Python to help avoid any confusion about the inner workings of the Monad. In the end, all Monads are just objects, like trees, lists, or dictionaries.
 
 ```python
-class OptionException(Exception):
-    pass
-
 class Option:
     def __init__(self, failed, value):
         self._failed = failed
@@ -124,13 +129,7 @@ class Option:
 
     def __repr__(self):
         if self._failed:
-            return 'Option.none()'
-        else:
-            return 'Option.some({})'.format(self._value)
-
-    def __str__(self):
-        if self._failed:
-            return 'None'
+            return 'Nothing'
         else:
             return 'Some({})'.format(self._value)
             
@@ -144,7 +143,7 @@ class Option:
 
     def unwrap(self):
         if self._failed:
-            raise OptionException('This Option has no value')
+            raise Exception('This Option has no value')
         else:
             return self._value
     
@@ -160,36 +159,21 @@ class Option:
 This is the longest piece of code we've had so far, so let me break it down bit by bit.
 
 ```python
-class OptionException(Exception):
-    pass
-```
-
-This is how you create a custom exception in python. I could have used a built in error if I wanted, but I wanted it to be clear that this was part of the Option Monad that was causing the exception and not something else. You probably should object at this point, and yell at me, saying something like, "isn't the whole point of the Option Monad to get rid of exceptions?" Well, if you use the Option Monad correctly, you'll never run into this exception.
-
-```python
 class Option:
     def __init__(self, failed, value):
         self._failed = failed
         self._value = value
-```
-
-The `__init__` function is the constructor or initializer function for classes in python. Here all we do is create a boolean that indicates whether or not we have failed the computation or not, and if we haven't failed it, we store the result of the computation in `_value`. Note that if `_failed` is `True`, then we don't care what is in `_value`, because the computation has failed and that value has no meaning. I will note that the users of this class will probably never call `__init__` themselves, as we will later write alternate constructors that are easier for people to use.
-
-```python
+    
     def __repr__(self):
         if self._failed:
-            return 'Option.none()'
-        else:
-            return 'Option.some({})'.format(self._value)
-
-    def __str__(self):
-        if self._failed:
-            return 'None'
+            return 'Nothing'
         else:
             return 'Some({})'.format(self._value)
 ```
 
-This is how you define string representations of values in python. `__str__` is called when you cast something to a string or print it, and `__repr__` is shown in the python REPL, and is supposed to be a little more informative. But these are mostly for ease of use; they don't really matter when it comes to Monads in general.
+The `__init__` function is the constructor or initializer function for classes in python. Here all we do is create a boolean that indicates whether or not we have failed the computation or not, and if we haven't failed it, we store the result of the computation in `_value`. Note that if `_failed` is `True`, then we don't care what is in `_value`, because the computation has failed and that value has no meaning. I will note that the users of this class will probably never call `__init__` themselves, as we will later write alternate constructors that are easier for people to use.
+
+The `__repr__` function simply tells python how this object should be printed.
 
 ```python
     def is_some(self):
@@ -202,12 +186,12 @@ This is how you define string representations of values in python. `__str__` is 
 
     def unwrap(self):
         if self._failed:
-            raise OptionException('This Option has no value')
+            raise Exception('This Option has no value')
         else:
             return self._value
 ```
 
-These three functions are the meat of the Option Monad; these are the ways we interact with it. The `is_some` function returns `True` when there is a meaningful return value, and `False` if the computation failed. `is_none` does the opposite. `unwrap` returns the value of the Option Monad _if there is a value to be returned_, otherwise it throws an error. In order to use the `unwrap` function without an error, you must first check and see whether the computation succeeded or failed.
+These three functions are the meat of the Option Monad; these are the ways we interact with it. The `is_some` function returns `True` when there is a meaningful return value, and `False` if the computation failed. `is_none` does the opposite. `unwrap` returns the value of the Option Monad *if there is a value to be returned*, otherwise it throws an error. In order to use the `unwrap` function without an error, you must first check and see whether the computation succeeded or failed.
 
 ```python
     @classmethod
@@ -246,24 +230,45 @@ def divide_elements(ls, i1, i2):
     return division(res1.unwrap(), res2.unwrap())
 ```
 
-The above code is the exact same length in lines; and already has some benefits. One, these functions have a return type that can be determined just be looking at the code - not as useful in python as in other languages, but I hope you can see why they'd be useful in statically typed languages. Two, we don't have to remember the convention for every function. Before, we had to remember that `division` returned `None` for an error, but `index` returned `False, None` for an error. Despite these benefits, it's not that much of an improvement.
+The above code is the exact same length in lines; and already has some benefits. First, these functions have a return type that can be determined just be looking at the code - not as useful in python as in other languages, but they are very useful in statically typed languages. Second, we don't have to remember the convention for every function. Before, we had to remember that `division` returned `None` for an error, but `index` returned `False, None` for an error. Despite these benefits, it's not that much of an improvement.
 
 And that's because we haven't yet implemented the most important function for a Monad. This is the most important but also the most complicated part of the Option Monad, so I am going to insert a header for this.
 
-## The Bind Function
+## The Bind and Fmap Functions
 
 ```python
     def bind(self, function):
         if self.is_none():
-            return type(self).none()
+            return self
         
         val = self.unwrap()
         return function(val)
 ```
 
-The bind function first checks whether or not `self` is None or Some. If `self` is None, then we return a new None instance. If self is Some, we unwrap the value, and pass it into the function, returning what the function returns. Because we're sort of pretending to be in a typed language here, we should remember that the function passed in _should_ return an Option Monad.
+The bind function is higher order function. That means it's a function that takes another function as an argument, and does something with that function. If you look in the end of the previous section, we repeated this piece of code two times:
 
-So, with `bind` in mind, let's consider the our code again.
+```python
+    res = index(ls, i1)
+    if res.is_none():
+        return Option.none()
+```
+
+We were checking whether or not a function had successfully computed a value, or whether an error had occurred. If the value existed, we later passed that value into a function. If the value did not exist, then we simply returned the indication of failure, an `Option.none()` object.
+
+Looking at bind, we can see it does exactly that. `res.bind(function)` checks whether or not `res` is a successfully computed value, in which case it passes that value into `function`, or if it is a failed computation, in which case it simply returns itself, passing the failed computation forward.
+
+```python
+    def fmap(self, function):
+        if self.is_none():
+            return self
+
+        val = self.unwrap()
+        return Option.some(function(val))
+```
+
+`fmap` does something similar to `bind`; whereas the function passed to `bind` might fail, and therefore returns an Option Monad, a function passed to `fmap` will always succeed, and therefore the return value needs to be wrapped in an Option Monad again. `fmap` and `bind` serve very similar purposes, but they are useful in different contexts.
+
+So, with `fmap` and `bind` in mind, let's consider the our code again.
 
 ```python
 def division(x, y):
@@ -285,15 +290,28 @@ def divide_elements(ls, i1, i2):
     return res2.bind(res1.bind(partial))
 ```
 
-I've changed a few things, so go back and look at what I've done. There's this new line `partial = lambda x: lambda y: division(x,y)`. This is a way of defining an inline function in python; here, I have a function of x that returns a function of y, that itself returns `division(x,y)`. That's a bit complicated, so think about it for a second.
+I've changed a few things, so go back and look at what I've done. There's this new line `partial = lambda x: lambda y: division(x,y)`. This is a way of defining an inline function in python; here, I have a function of x that returns a function of y, that itself returns `division(x,y)`. This makes it so that instead of calling this function with two arguments, I instead call it with one argument twice. Here's an example of using a similar lambda function:
 
-What I then do on the return statement line is I use bind to apply the function to these arguments; the function `division` will fail drastically if it gets an Option Monad in as an argument; it would fail on the comparison to zero and it would also fail on trying to divide two Option Monads. By using `bind`, I am telling the Options to apply the function to themselves if they have a value, or returning None if they don't have a value. This wraps the error handling into the data structure that represents errors without me having to ever write an explicit `if x.is_some():` check.
+```python
+partial = lambda x: lambda y: x/y
 
-You may still think this sort of thing is useless; and in python, for such a simple example, it kinda is! But as we continue to explore Monads, we will encounter some weirder and wilder examples of things that Monads make simpler.
+two_over = partial(2)
+two_over(3) # same as 2 / 3
+two_over(5) # same as 2 / 5
+
+ten_over = partial(10)
+ten_over(50) # same as 10 / 50
+
+partial(3)(4) # same as 3 / 4
+```
+
+What I do on the return statement line is I use bind to apply the function to these arguments; the function `division` will fail drastically if it gets an Option Monad in as an argument; it would fail on the comparison to zero and it would also fail on trying to divide two Option Monads. By using `bind`, I am telling the Options to apply the function to themselves if they have a value, or returning Nothing if they don't have a value. This wraps the error handling into the data structure that represents errors without me having to ever write an explicit `if x.is_some():` check.
+
+You may still think this sort of thing is useless; and in python, for such a simple example, it kinda is! But as we continue to explore Monads, we will encounter some examples of things that get more and more complex without Monads, but that Monads make simpler. Oh hey look, that's the next section.
 
 ## A More Complex Example
 
-In order to give a more illustrative example of where the Option Monad can be more useful, consider the following problem; open a file, and read the first whitespace separated word from the beginning of the file, and parse it into an integer if possible. This problem is fairly easy to do with built in python functions, but the Option Monad can make error handling easier. However, none of python's built in functions use the Option Monad, so we will have to rewrite them so that they do. In languages with the Option Monad as a star player, this isn't an issue.
+In order to give a more illustrative example of where the Option Monad can be more useful, consider the following problem; open a file, and read the first whitespace separated word from the beginning of the file, and parse it into an integer if possible. This problem is fairly easy to do with built in Python functions, but the Option Monad can make error handling easier. However, none of Python's built in functions use the Option Monad, so we will have to rewrite them so that they do. In languages with the Option Monad as a star player, such as Rust, Haskell, or Scala, this isn't an issue.
 
 ```python
 def option_open(filename, mode='r'):
@@ -342,18 +360,18 @@ def option_int(s):
     return i
 ```
 
-I'm not going to explain these functions too much; basically they do the same thing as their built in python counterparts, but they return Some if the computation succeeds and None if it fails, instead of throwing an error or using some other return code. This will allow us to use `bind` to chain these functions.
+These functions perform the exact same operations as their Python counterparts, but they return Some if the computation succeeds and Nothing if it fails, instead of throwing an error or using some other return code. This will allow us to use `bind` to chain these functions.
 
 ```python
 result = (Option.some('text.txt')
-.bind(option_open)
-.bind(option_read)
-.bind(lambda x: option_match(r'\s*(\S*)', x))
-.bind(lambda x: option_get_group(x, 1))
-.bind(option_int))
+    .bind(option_open)
+    .bind(option_read)
+    .bind(lambda x: option_match(r'\s*(\S*)', x))
+    .bind(lambda x: option_get_group(x, 1))
+    .bind(option_int))
 ```
 
-This code is useful because if an error happens at any time during the computation, it just passes a None Option through the rest of the bind functions.
+This code opens a text file, reads the entire file from it, looks at the first word in the file, and tries to read it in as an integer. Using the Option Monad is useful because if an error happens at any time during the computation, it just passes a Nothing Option through the rest of the bind functions.
 
 We can make this look cooler by choosing an infix operator to overload. By convention, `>>=` is used, but that's hard to to do in python, so we are going to use `>>`. We can override that operator in python with the following code:
 
@@ -362,7 +380,7 @@ def __rshift__(self, function):
     return self.bind(function)
 ```
 
-This code let's us rewrite the above option code as the following.
+Now, let's rewrite the above option code as the following.
 
 ```python
 result = (
@@ -375,11 +393,96 @@ result = (
     )
 ```
 
+Consider the same operation in regular Python. We can write it in one expression, in which case this is impossible to read, or we can split it up, over many lines, creating a bunch of temporary variables that we use once and then never again.
+
+```python
+# one expression
+result = int(
+        re.match(
+            r'\s*(\S*)',
+            open('text.txt').read()
+        ).group(1)
+    )
+
+# with temporary variables
+temp1 = open('text.txt').read()
+temp2 = re.match(r'\s*(\S*)', temp1).group(1)
+result = int(temp2)
+```
+
+The first example is unreadable. The functions used have no meaningful order, so it becomes an act of mental gymnastics to figure out what happens when. The functions appear in the order `int`, `match`, `open`, `read`, and `group`. `int` comes first, despite being called last, and `open`, the first function to be called, appears randomly in the middle.
+
+The second example is the shortest version where all the functions appear in the source code in the order they are called, and so it is pretty readable, but once again we've got the problem of errors!
+
+This code could blow up if the wrong information is passed into it, and it can blow up in approximately 5 places. Even worse, because `.group()` can return `None` if it fails, and `int(None) == 0`, you can get a wrong answer from this code without an error being thrown. In order to guarantee that this code doesn't fail, this is the sort of code you would need to write in Python.
+
+```python
+try:
+    temp1 = open('text.txt').read()
+    temp2 = re.match(r'\s*(\S*)', temp1).group(1)
+    if temp2 == None:
+        result = None
+    else:
+        result = int(temp2)
+except Exception:
+    result = None
+```
+
+The above code now won't throw any errors or produce erroneous results, and will set `result` to `None` if the code fails. Now, compare that safe version without Monads to the version that is safe with Monads.
+
+```python
+result = (
+    Option.some('text.txt')
+      >> option_open
+      >> option_read
+      >> (lambda x: option_match(r'\s*(\S*)', x))
+      >> (lambda x: option_get_group(x, 1))
+      >> option_int
+    )
+```
+
+The Monad version is simpler, just as safe, and even a line shorter (two if you don't count the line with a single closing parenthesis). Not to mention cooler by far.
+
+
 ## The Result Monad
 
-There is one downside to the Option Monad as far as we've discussed it. When the above code is run, you can't tell where or why an error occurs; no matter where the error occurs, you just end up with an inscrutable None.
+There is one major problem with the Option monad above; if our code fails, we have no way to know how or when. With the standard python example, we could print an error message to the screen or to a file that would let us know what kind of error occurred. There is another Monad, called the Result Monad, that allows us to do that while still having the power of the Option Monad. I won't reproduce the entire code here (it is in the appendix) but I will go over a few of the changes, as we will use the Result Monad in the next section.
 
-Luckily, these is a simple modification to the Option Monad that makes is able to convey error messages. Some languages call this the Result Monad. I'm not going to go in depth as to how it works, because it's very similar to the Option Monad. I will, however, highlight one function from below.
+The Result Monad uses slightly different names; a value is Ok if it is a successful computation, and it is an Error if it has failed. The functions to check this status are `self.is_ok()` and `self.is_error()`.
+
+```python
+    def __init__(self, failed, value, message):
+        self._failed = failed
+        self._message = message
+        self._value = value
+```
+
+Our `__init__` function now takes an additional argument; an error message. Now, we have a value that indicates whether or not our computation has failed, a value that stores the result of the computation (if the computation succeeded), and a value that stores the error message (if the computation failed).
+
+In order to access the error message, we add a new function like `unwrap`.
+
+```python
+    def error_msg(self):
+        if self.is_error():
+            return self._message
+        else:
+            raise Exception('This Result is Ok')
+```
+
+This function checks whether or not we have failed, and returns the error message if it is an Error. Just like `unwrap`, it throws an Exception if there is no error message.
+
+`bind` has not changed at all, but it is nice to note that when you return `self` in the case of the error, the error message stays the same.
+
+```python
+    def bind(self, function):
+        if self.is_error():
+            return self
+        
+        val = self.unwrap()
+        return function(val)
+```
+
+I'm also adding another function that is sort of like `bind`, but instead, provides a simple way for Monadic computations to check for errors, and if they've occurred, to replace the computed value with a default value.
 
 ```python
     def recover(self, function):
@@ -389,68 +492,29 @@ Luckily, these is a simple modification to the Option Monad that makes is able t
         return self
 ```
 
-The `recover` function is the opposite of `bind`; if the result is a failure, it will attempt to recover computation by replacing the current Result Monad with the result of whatever function is passed in. If the result is a success, however, it leaves the value alone.
-
-Here is the full source code for the Result Monad; I do recommend familiarizing yourself with it before we move on.
+This function allows you to perform an operation like getting a value from a configuration file, but using a default value if it fails, with Monads. The following snippet, for example, uses results to open, read, and parse some number from a file, and then it checks whether the operation failed at any level, and uses the value of `10` if it failed.
 
 ```python
-class ResultException(Exception):
-    pass
+config = (
+    result_open('config.txt')
+      >> result_read
+      >> result_parse
+    ).recover(lambda: Result.ok(10))
+```
 
-class Result:
-    def __init__(self, failed, value, message):
-        self._failed = failed
-        self._message = message
-        self._value = value
+The equivalent in plain Python would be the following.
 
-    def __repr__(self):
-        if self._failed:
-            return 'Option.error({})'.format(repr(self._message))
-        else:
-            return 'Option.ok({})'.format(repr(self._value))
+```python
+try:
+    temp1 = open('config.txt').read()
+    config = parse(temp1)
+except Exception:
+    config = 10
+```
 
-    def __str__(self):
-        if self._failed:
-            return 'Error({})'.format(self._message)
-        else:
-            return 'Ok({})'.format(self._value)
+We've already seen these used above, but for completeness here are the two constructors for the Result Monad.
 
-    def is_ok(self):
-        if self._failed:
-            return False
-        return True
-
-    def is_error(self):
-        return not self.is_ok()
-    
-    def unwrap(self):
-        if self.is_ok():
-            return self._value
-        else:
-            raise ResultException('This Result is an Error')
-    
-    def error_msg(self):
-        if self.is_error():
-            return self._message
-        else:
-            raise ResultException('This Result is Ok')
-            
-    def bind(self, function):
-        if self.is_error():
-            return self
-        
-        val = self.unwrap()
-        return function(val)
-    
-    def recover(self, function):
-        if self.is_error():
-            return function()
-        
-        return self
-    
-    def __rshift__(self, function):
-        return self.bind(function)
-
+```python
     @classmethod
     def ok(cls, val):
         return cls(False, val, None)
@@ -458,84 +522,15 @@ class Result:
     @classmethod
     def error(cls, msg):
         return cls(True, None, msg)
-
-# The following are built in functions
-# rewritten to work with the Result Monad
-
-def result_open(filename, mode='r'):
-    try:
-        fd = Result.ok(open(filename, mode=mode))
-    except Exception:
-        fd = Result.error("Failed to open the file")
-    return fd
-
-def result_read(fd, size=-1):
-    try:
-        data = Result.ok(fd.read(size))
-    except Exception:
-        data = Result.error("Failed to read from the file")
-    return data
-
-import re
-
-def result_match(pattern, string):
-    match = re.match(pattern, string)
-    if match:
-        match = Result.ok(match)
-    else:
-        match = Result.error("Failed to match the pattern")
-    return match
-
-def result_get_group(match, group):
-    try:
-        g = match.group(group)
-    except Exception:
-        g = None
-
-    if g == None:
-        g = Result.error("Failed to get the group from the match")
-    else:
-        g = Result.ok(g)
-        
-    return g
-
-def result_int(s):
-    try:
-        i = Result.ok(int(s))
-    except Exception:
-        i = Result.error("Failed to parse into an integer")
-    return i
-
-
-result = (
-    Result.ok('text.txt')
-      >> result_open
-      >> result_read
-      >> (lambda x: result_match(r'\s*(\S*)', x))
-      >> (lambda x: result_get_group(x, 1))
-      >> result_int
-    )
-
-print(result)
 ```
-
-## Either Monad
-
-Another common Monad that is not worth writing in python but invaluable in some other languages, and is in fact a more general form of the Result Monad, is the Either Monad. An Either Monad is really useful in strictly typed languages, because it can be returned from a function that can return two possible types.
-
-I'm not going to implement this in python, because this is mostly useless for a python program, but it's essentially identical to the Result Monad implementation. Try it out!
 
 # A Parsing Monad
 
-This is our first look into a complex and powerful Monad that represents a very useful computer science tool. We are going to use a Monad called the Parsing Combinator, which basically recreates and improves upon regex using Monads. Here we see the truth of the oft said but little understood aphorism that Monads represent computation; here, they represent the computation of regular expressions.
+We're now going to talk about a Monad called the Parsing Combinator, which basically recreates and improves upon regular expressions using Monads. Here we see the truth of the oft said but little understood aphorism that Monads represent computation; here, they represent the computation of regular expressions.
 
-It's also worth noting that there are many python Parsing Combinator libraries on the python package index, so if you want to use this for real, find one of them, and not mine; theirs is better written, faster, and provides more functionality.
+It's also worth noting that there are many python Parsing Combinator libraries on the python package index, and those will have faster, more powerful implementations than the one below.
 
 ## The Code
-
-First of all, I am going to use the above Result Monad to help me implement this Parsing Combinator. Even though the parsing itself is Monadic, it has to return a result that can either be a success or a failure; so the Result Monad is going to be useful.
-
-With that said, let's step through the code for our Parsing Combinator.
 
 ```python
 class Parser:
@@ -720,7 +715,7 @@ We also have a few other important functions that we use to build more complex p
 
 Finally, `optional` tries to match the input text with `self`, but if it fails, it matches nothing and finishes.
 
-Finally, we add symbolic versions of many of the above functions. This is purely for ease of reading the expressions we will write; you will see that they can get pretty complex, and we don't want to
+Finally, we add symbolic versions of many of the above functions. This is purely for ease of reading the expressions we will write; you will see that they can get pretty complex, and `this.concat(that)` is harder to understand at a glance than `this + that`.
 
 ```python
     # |
@@ -764,7 +759,7 @@ Now we can move on to the Monadic functions.
  * `bind_func` takes the result, and passes the matched value through the function passed in to the Parser's bind function. This gives us a Result Monad, and we pull out it's value (if it exists).
  * Then we build the new Result Monad holding `(matched value, remainder of text)`, except now the matched value is the result of `function`.
  
-This lets us bind functions that affect the result we get at the end of our parsing, by changing the match, but not interrupting the parsing, by changing the remainder of the text.
+__*EXPLAIN WHAT BIND DOES AT A HIGH LEVEL*__
 
 ```python
     def fmap(self, function):
@@ -872,8 +867,6 @@ def result_float(x):
 Parser.parse_total(number, '7.22345e10') >> result_float
     # Ok(72234500000.0)
 ```
-
-One really
 
 ## Going Further
 
@@ -1003,169 +996,76 @@ print(Parser(expr).parse_total(text))
 
 # Theory of Monads
 
-Now that we've seen many types of Monads, we should discuss the technical, boring discussion of what a Monad is. A Monad is, in essence, any construct, usually an object, in a language that satisfies the following criteria. I will say each criterion in two ways; a simple way, and a correct way.
+Now that we've seen a few examples of what a Monad is, we can talk about the formal definition. This is going to be the most abstract section of the text, but I'll try and keep any statements from category theory or abstract algebra from appearing here.
 
-However, there are two ways to define Monads. The two definitions in practice lead to the exact same object, but some Monads are easier to deal with using one definition, and other Monads are easier to deal with using the other. I will start with the Monad laws that are easiest for the Option Monad.
+## Defining Monads
 
-## The Monad Laws with `bind`
+Monads are a special type of object that contains with in it a value and a context. Our Option and Result Monads contained the result of a computation, along with contextual information regarding whether the operation had succeeded or failed. This allowed us to write programs that could detect failure elegantly. Our Parsing Monad contained the result of the parsing so far, as well as the rest of the text remaining to be parsed. Whenever you see a Monad, you can sum up its operation by asking "What is the value in this Monad, and what is the context?". Many people, when confronted with Monads, want a way to get the value out of the Monad. But this causes problems, because you've taken the value out of context, and it becomes significantly more useless.
 
- * For any type `t`, and Monad type `M`, `M t` is the type of the Monad holding that type.
-    * _Monads can hold values_
- * There is a function called 'unit' or 'return' that has type `t -> M t` which injects a value of type `t` into a Monad of type `M t` in some simple way.
-    * _There is a function to create Monads from regular values_
- * There is a binding operation of type `M t -> (t -> M u) -> M u` which maps the value of a Monad of type `M t` into another Monad of type `M u` by using a function that maps a value of type `t` into a Monad of type `M u`
-    * _There is a bind function, as discussed earlier_
+In order to interact with the values without taking them out of their context, we have a function called `fmap`. `fmap` takes the value, and applies the function to that value, and puts the result of he function back into context. In our Option and Result Monads, it applied the function to the value if our computation was successful, or it simply bypassed the function if our computation had failed. In our parsing combinator, it applied the function to the result of our computation, while leaving the remainder of the text to be parsed alone.
 
-These above laws also have to follow a set of rules that determines how the above functions can be combined. These rules are super simple; basically they just exist to make sure that the bind function and the constructor don't do anything funky.
+However, this meant that we couldn't use functions on the values in our Monad if the functions themselves returned Monads. For our Option and Result Monads, that means that we couldn't use a function that could fail (a function that returned an Option or Result Monad) on our Monad with `fmap`. If we did that, we could end up with a recursive Monad, like `Some(None)` or `Some(Some(3))`. This is annoying, and there's two ways to fix this weirdness.
 
- * The unit function acts as a neutral element of bind
-    * _Calling bind on the unit function (or constructor) doesn't do anything_
+The first way, which we used in the previous section, is to use a function called `bind`. `bind` is the same as `fmap`, but instead of putting the return value of the function passed to `bind` back into the same context, it expects that `bind` will return a new value and context (a Monad of some kind).
+
+The second way is an alternative to `bind`; you don't need both, and it's more common to have `bind` as the one to use, so I haven't bothered talking about it yet. This function is called `join`, and it takes a recursive Monad and flattens it from two layers to one layer. For example:
 
 ```python
-            Option.some(5).bind(Option.some) == Option.some(5)
+Option.some(Option.some(x)).join() == Option.some(x)
+Option.some(Option.none()).join() == Option.none()
+Option.none().join() == Option.none()
 ```
 
- * Binding two functions in series is the same as binding the result of composing those two functions
-    * _You don't have to worry about binding doing weird things to your values; an example is really useful here_
+We can show that `join` isn't any less useful than `bind` by actually writing `bind` using only `join` and `fmap`.
 
 ```python
-            def one_over(x):
-                if x == 0:
-                     return Option.none()
-                return Option.some(1/x)
-
-            def two_over(x):
-                if x == 0:
-                    return Option.none()
-                return Option.some(2/x)
-
-            Option.some(5).bind(one_over).bind(two_over) == \
-            Option.some(5).bind(lambda x: one_over(x).bind(two_over))
+def bind(monad, function):
+    return monad.fmap(function).join()
 ```
 
-## `fmap` and `join`
+This does the same thing as `bind` usually does; it applies the function to the inside value if the Monad isn't Nothing, and then it returns Nothing if either the function returns or the Monad is Nothing, or it returns Some(value) if the function succeeds and the Monad had a value to pass into the function.
 
-If you want, you can replace the bind function with two slightly different functions, and you get the same exact system. These two functions are called `fmap` and `join`. Below, I'll implement them for the Option Monad.
+We can also show a way to write `fmap` and `join` solely using `bind`:
 
 ```python
-    def fmap(self, function):
-        if self.is_none():
-            return self
-        val = self.unwrap()
-        return Option.some(function(val))
+def fmap(monad, function):
+    monad.bind(lambda x: Option.some(function(x)))
 
-    def join(self):
-        if self.is_none():
-            return self
-        val = self.unwrap()
-        return val
+def join(monad):
+    monad.bind(lambda x: x.unwrap() if x.is_some() else x)
 ```
 
-`fmap` is the simpler of the two. `fmap` applies a function to the Option's value, if it has one. The difference between `fmap` and `bind` is that `fmap` assumes that it's function will always succeed, and therefore doesn't need to return an Option Monad. We have already seen `fmap`, with the Parsing Combinator, but we haven't really given it it's full introduction until now.
+This means, for our purposes, for something to be a Monad, we require it to either have both `fmap` and `join` *or* `bind`.
+
+## Monad Laws
+
+Now, Monads have three laws, or rules, they have to follow; this is just to make sure Monads don't have any unexpected behavior, but we should go over those rules anyway.
+
+First of all, if you `fmap` over a Monad with the identity function (a function that returns its inputs unchanged), the value in the Monad doesn't change.
 
 ```python
-def plus_one(x):
-    return x + 1
-
-Option.some(5).fmap(plus_one)
+Monad(x).fmap(lambda x: x) == Monad(x)
 ```
 
-In the above example, we can't use `bind`, because `plus_one` doesn't return an Option Monad, so it would break our chain of `bind` commands. However, `fmap` can be used instead. But `fmap` can't be a replacement for `bind` all on it's own.
+Secondly, if you `fmap` two functions in a row, it should be the same as simply `fmap`ing the function which does the equivalent of those two functions in order.
 
 ```python
-def one_over(x):
-    if x == 0:
-         return Option.none()
-    return Option.some(1/x)
-
-Option.some(5).fmap(one_over) == Option.some(Option.some(0.2))
-Option.some(0).fmap(one_over) == Option.some(Option.none())
+m.fmap(lambda x: x+1).fmap(lambda x: x+2) == m.fmap(lambda x: x+3)
 ```
 
-In the above example, `fmap` adds an additional layer of the Option Monad. This is where `join` comes in. `join` collapses two layers of a Monad into one layer.
+Finally, if you apply a function to a value and then stick it in a Monad, it is the same as putting that value in a Monad and `fmap`ing that function.
 
 ```python
-Option.some(5).fmap(one_over).join() == Option.some(0.2)
-Option.some(0).fmap(one_over).join() == Option.none()
-Option.none().fmap(one_over).join() == Option.none()
+Monad(x).fmap(f) == Monad(f(x))
 ```
 
-As a matter of practice, most Monads will implement all three; `bind`, `fmap`, and `join`. Annoyingly, different languages and libraries name these functions different things, but they're probably there under different names.
+If you want, you can put these rules into equivalent forms using `bind` instead of `fmap`.
 
-A simple proof that it doesn't matter if you use `bind` or `fmap` and `join` is to simply use one set to implement the other. In the following code, I will do that for the Result monad.
-
-```python
-# bind implemented for a monad that only has fmap and join
-def bind(result, function):
-    return result.fmap(function).join()
-
-# fmap and join implemented for a monad that only has bind
-def fmap(result, function):
-    always_works = lambda x: Result.ok(function(x))
-    return result.bind(always_works)
-
-def join(result):
-    returns_self: lambda x: x
-    return result.bind(returns_self)
-```
-
-In the above code, we can see that `bind` is defined by first `fmap`ing the function over the Monad, producing something like `Result.ok(Result.ok(3))`, and then joining those two layers into one; the same behavior that `bind` usually has.
-
-`fmap` is defined by simply creating a version of the function that works with `bind`; since `fmap` is supposed to take a function that doesn't return a Monad, and thus always succeeds, we can just wrap the result of that in a `Result.ok()`
-
-`join` is super simple; `join` is supposed to collapse two layers of Monads into one. We can do this by simply `bind`ing a function that simply returns itself; this will be passed the inner layer of the nested Monad, and return that as the new Monad.
-
-## The Monad Laws with `fmap` and `join`
-
-A lot of these laws are the exact same.
-
- * For any type `t`, and Monad type `M`, `M t` is the type of the Monad holding that type.
-    * _Monads can hold values_
-
- * There is a function called 'unit' or 'return' that has type `t -> M t` which injects a value of type `t` into a Monad of type `M t` in some simple way.
-    * _There is a function to create Monads from regular values_
-
- * There is a mapping operation of type `M t -> (t -> u) -> M u` which maps the value of a Monad of type `M t` into another Monad of type `M u` by using a function that maps a value of type `t` into a Monad of type `M u`
-    * _There is an fmap function, as discussed earlier_
-
- * There is a mapping operation of type `M M t ->  M t` which
-    * _There is an fmap function, as discussed earlier_
-
-These above laws also have to follow a set of rules that determines how the above functions can be combined. These rules are very similar to the `bind` rules.
-
- * The identity function acts as the neutral element of fmap
-    * _Calling fmap on the function f(x) = x doesn't do anything_
-
-```python
-            Option.some(5).fmap(lambda x: x) == Option.some(5)
-```
-
- * The unit function acts as the neutral element of the composition of fmap and join.
-    * _Join doesn't do anything weird to values._
-
-```python
-            Option.some(5).fmap(Option.some).join() == Option.some(5)
-```
-
-&nbsp;
-
- * Fmapping two functions in series is the same as Fmapping the result of composing those two functions.
-    * _You don't have to worry about fmapping doing weird things to your values; an example is really useful here_
-
-```python
-            def plus_one(x):
-                return x + 1
-
-            def plus_two(x):
-                return x + 2
-
-            Option.some(5).fmap(plus_one).fmap(plus_two) == Option.some(5) \
-                .bind(lambda x: plus_two(plus_one(x)))
-```
+These might seem common sense, and if they are, that's good! The only reason that we require that these rules are followed is so that somebody doesn't create a Monad that behaves weirdly and it screws up our program. If they don't seem common sense, that's okay; you don't really have to understand them.They basically boil down to "Monads should behave sensibly when you fmap functions over them".
 
 # The Zeroth Monad
 
-Our first section was titled 'Our First Monad'. However, we are computer scientists, and therefore we start counting at zero, not at one. So let's talk about another Monad that everyone reading this document has probably used, but never noticed that it was a Monad. A list.
+Our first section was titled 'Our First Monad'. However, we are computer scientists, and therefore we start counting at zero, not at one. So let's talk about another Monad that everyone reading this document has probably used, but never noticed that it was a Monad. It turns out that a list is a Monad.
 
 How is a list a Monad? Well, from the previous section, a Monad is really just anything with a `bind` function, or with a `fmap` and a `join` function. And while not every programming language has these functions built in, we can easily write these functions for a list.
 
@@ -1227,3 +1127,138 @@ bind(
 ```
 
 In this case, we execute two functions in series, getting all of the valid results to our question in one list; but the number of results isn't the same for all inputs, so we need a Monad to represent this computational uncertainty.
+
+\newpage
+\appendix
+
+# Code: The Result Monad
+
+```python
+class Result:
+    def __init__(self, failed, value, message):
+        self._failed = failed
+        self._message = message
+        self._value = value
+
+    def __repr__(self):
+        if self._failed:
+            return 'Option.error({})'.format(repr(self._message))
+        else:
+            return 'Option.ok({})'.format(repr(self._value))
+
+    def __str__(self):
+        if self._failed:
+            return 'Error({})'.format(self._message)
+        else:
+            return 'Ok({})'.format(self._value)
+
+    def is_ok(self):
+        if self._failed:
+            return False
+        return True
+
+    def is_error(self):
+        return not self.is_ok()
+    
+    def unwrap(self):
+        if self.is_ok():
+            return self._value
+        else:
+            raise Exception('This Result is an Error')
+    
+    def error_msg(self):
+        if self.is_error():
+            return self._message
+        else:
+            raise Exception('This Result is Ok')
+            
+    def bind(self, function):
+        if self.is_error():
+            return self
+        
+        val = self.unwrap()
+        return function(val)
+        
+    def fmap(self, function):
+        if self.is_error():
+            return self
+        
+        val = self.unwrap()
+        return Result.ok(function(val))
+    
+    def recover(self, function):
+        if self.is_error():
+            return function()
+        
+        return self
+    
+    def __rshift__(self, function):
+        return self.bind(function)
+
+    @classmethod
+    def ok(cls, val):
+        return cls(False, val, None)
+    
+    @classmethod
+    def error(cls, msg):
+        return cls(True, None, msg)
+
+# The following are built in functions
+# rewritten to work with the Result Monad
+
+def result_open(filename, mode='r'):
+    try:
+        fd = Result.ok(open(filename, mode=mode))
+    except Exception:
+        fd = Result.error("Failed to open the file")
+    return fd
+
+def result_read(fd, size=-1):
+    try:
+        data = Result.ok(fd.read(size))
+    except Exception:
+        data = Result.error("Failed to read from the file")
+    return data
+
+import re
+
+def result_match(pattern, string):
+    match = re.match(pattern, string)
+    if match:
+        match = Result.ok(match)
+    else:
+        match = Result.error("Failed to match the pattern")
+    return match
+
+def result_get_group(match, group):
+    try:
+        g = match.group(group)
+    except Exception:
+        g = None
+
+    if g == None:
+        g = Result.error("Failed to get the group from the match")
+    else:
+        g = Result.ok(g)
+        
+    return g
+
+def result_int(s):
+    try:
+        i = Result.ok(int(s))
+    except Exception:
+        i = Result.error("Failed to parse into an integer")
+    return i
+
+
+result = (
+    Result.ok('text.txt')
+      >> result_open
+      >> result_read
+      >> (lambda x: result_match(r'\s*(\S*)', x))
+      >> (lambda x: result_get_group(x, 1))
+      >> result_int
+    )
+
+print(result)
+```
