@@ -435,8 +435,6 @@ match_a.<span class="bu">tuple</span>(match_b)</code></pre></div>
 <p><code>choice</code> implements the ability to try one parser, and if it fails, recover by trying another. Be careful with this one, because it only operates locally. If you try and match <strong>x</strong> or <strong>y</strong>, and <strong>x</strong> succeeds in matching the text but puts you in a corner that causes failure later on, it won't backtrack and try <strong>y</strong>. It will only backtrack and try <strong>y</strong> if matching <strong>x</strong> fails.</p>
 <p><code>many</code> is perhaps the most complicated constructor. What we want to do is continually match one parser, using a function to combine the results, until a failure occurs; but when a failure occurs, we want to ignore the failure and return that previous match. We also implement <code>many1</code> that matches one or more examples of an object, not zero or more like <code>many</code>.</p>
 <p>There is also a variant of <code>many</code> called <code>many_list</code>, which instead of combining them by concatenating them, like <code>many</code> does, simply collects a list of all of the many matches.</p>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="kw">def</span> optional(<span class="va">self</span>):
-        <span class="cf">return</span> <span class="va">self</span>.choice(Parser.empty())</code></pre></div>
 <p>Finally, <code>optional</code> tries to match the input text with <code>self</code>, but if it fails, it matches nothing and finishes.</p>
 <p>Finally, we add symbolic versions of many of the above functions. This is purely for ease of reading the expressions we will write; you will see that they can get pretty complex, and <code>this.concat(that)</code> is harder to understand at a glance than <code>this + that</code>.</p>
 <p>Now we can move on to the Monadic functions.</p>
@@ -491,6 +489,10 @@ match_a.<span class="bu">tuple</span>(match_b)</code></pre></div>
 <tr class="even">
 <td align="right"><code>&gt;</code></td>
 <td><code>fmap</code></td>
+</tr>
+<tr class="odd">
+<td align="right"><code>|</code></td>
+<td><code>choice</code></td>
 </tr>
 </tbody>
 </table>

@@ -632,11 +632,6 @@ We also have a few other important functions that we use to build more complex p
 
 There is also a variant of `many` called `many_list`, which instead of combining them by concatenating them, like `many` does, simply collects a list of all of the many matches.
 
-```python
-    def optional(self):
-        return self.choice(Parser.empty())
-```
-
 Finally, `optional` tries to match the input text with `self`, but if it fails, it matches nothing and finishes.
 
 Finally, we add symbolic versions of many of the above functions. This is purely for ease of reading the expressions we will write; you will see that they can get pretty complex, and `this.concat(that)` is harder to understand at a glance than `this + that`.
@@ -680,6 +675,8 @@ Here is a full table of which functions I have bound to which symbols:
 `&`      | `tuple`
 `>>`     | `bind`
 `>`      | `fmap`
+`|`      | `choice`
+
 
 There are also many constructors available, so here's a list of them and a brief description of what they do.
 
@@ -689,6 +686,7 @@ There are also many constructors available, so here's a list of them and a brief
 `oneof`       | Matches any one of the characters passed in as a string or list
 `empty`       | Matches nothing
 `noneof`      | Matches any character not passed in as a string or list
+
 
 
 ## Using the Parser Combinator
