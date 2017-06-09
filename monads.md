@@ -532,6 +532,8 @@ It's also worth noting that there are many python Parsing Combinator libraries o
 
 ## The Code
 
+Unlike the Option Monad, I'm not going to go over the entire codebase for the Parsing Combinator. I hope to provide enough context so that the inner workings aren't mysterious, but there is a lot of code (all in the appendix) and it is frankly quite dull at times.
+
 ```python
 class Parser:
     def __init__(self, function):
@@ -539,14 +541,11 @@ class Parser:
         
     def __call__(self, text, index):
         return self._function(text, index)
-
-    def __repr__(self):
-        return '<Parsing Combinator>'
 ```
 
-The basic idea behind our Parsing Combinator is that the Monad holds a function that takes a string, which we're going to call `text`, and it returns a Result Monad. If the result is a success, the Result Monad holds a tuple of the text that has matched the current parser, and the remainder of `text`. In order to make this a bit easier for us, we will implement the special method `__call__`, so that we can write stuff like `self(text)` instead of `self._function(text)` in the future. It's really hard to print functions meaningfully, so we're just going to define our representation as a constant string.
+The basic idea behind our Parsing Combinator is that the Monad holds a function that takes a string, which we're going to call `text`, and it returns a Result Monad. If the result is a success, the Result Monad holds a tuple of the text that has matched the current parser, and the remainder of `text`. In order to make this a bit easier for us, we will implement the special method `__call__`, so that we can write stuff like `self(text)` instead of `self._function(text)` in the future.
 
-I'm going to slightly deviate from our already established order to introduce the constructors first; then we can deal with the ways we can bind to and combine Parsing Combinators. These constructors will do two things; define a function, and then create a Parser using that function.
+Before we jump into all of the super complex functions, let's look at a basic constructor for this Parser Monad.
 
 ```python
     @classmethod
@@ -556,64 +555,21 @@ I'm going to slightly deviate from our already established order to introduce th
             try:
                 current = text[0]
             except IndexError:
-                return Result.error('End of String encountered'
-                    ', but {} is still expected'.format(repr(val)))
+                return Result.error('End of String encountered, but ' +
+                    '{} is still expected'.format(repr(val)))
             
             if current == val:
                 return Result.ok((text[0], text[1:]))
             else:
-                return Result.error('Failed to match character' +
-                    ' {} at {}'.format(repr(val), repr(text)))
+                return Result.error('Failed to match character {} at {}'
+                    .format(repr(val), repr(text)))
 
         return Parser(match_char)
-
-    @classmethod
-    def empty(cls):
-
-        def match_empty(text):
-            return Result.ok(('', text))
-
-        return Parser(match_empty)
-
-    @classmethod
-    def oneof(cls, charls):
-
-        def match_charls(text):
-            try:
-                current = text[0]
-            except IndexError:
-                return Result.error('End of String encountered, but '
-                    'one of {} is still expected'.format(list(charls)))
-
-            if current in charls:
-                return Result.ok((text[0], text[1:]))
-            else:
-                return Result.error('Failed to match one of {} at {}'
-                    .format(list(charls), repr(text)))
-
-        return Parser(match_charls)
-
-    @classmethod
-    def noneof(cls, charls):
-
-        def none_charls(text):
-            try:
-                current = text[0]
-            except IndexError:
-                return Result.error('End of String encountered,'
-                    ' but none of {} is still expected'.format(repr(text)))
-
-            if current not in charls:
-                return Result.ok((text[0], text[1:]))
-            else:
-                return Result.error('Found one of'
-                    ' {} at {} when there should be none of'.format(
-                    list(charls), repr(text)))
-
-        return Parser(none_charls)
 ```
 
-These all follow fairly simple rules; they are the equivalent of some fairly basic regular expressions. The first one tries to compare the first character of the text to a character, and if it can, it pulls that character off of the text, and returns the character and the remainder as the result. The second one does absolutely nothing to the input text, simply returning the empty string and the input unchanged. The third and fourth represent character classes, but still match exactly one character from the beginning of the text. To do advanced parsing, we're going to need some more advanced constructors; ones that combine other parsers into new parsers.
+This constructor creates a Parser with the function `match_char`. If we look at `match_char`, despite its length, it is a very simple function. First, it tries to see what the first character in the string (`current`) is, checking for an error (and returning an Error Result Monad) if there is one. Then, it compares  `current` to the value that was passed into the constructor, and sees if it matches. If it does match, then it returns an Ok Result, with the parsed value being the character, and the remaining text being the rest of the text, from the parsed character on.
+
+Now that we've seen a way to construct this Monad, let's look at how to combine simple Parsing Combinators into more complex ones.
 
 ```python
     def combine(self, other, function):
@@ -627,11 +583,13 @@ These all follow fairly simple rules; they are the equivalent of some fairly bas
             else:
                 return res
             
-        return Parser(lambda text: self(text)
-            .bind(lambda res: combine_func(*res)))
+        return (
+              Parser(lambda text: self(text)
+                .bind(lambda res: combine_func(*res)))
+            )
 ```
 
-`combine` is the most useful function for us; it takes two parsers (`self` and `other`) and a function. It creates a new parser that first executes `self` on the input text, and then it executes `other` on the remaining text after `self`'s match. Then it uses `function` to combine the two matches, and returns that combination along with the remaining text. We're also going to define a few functions that call combine with a particular function
+`combine` is the most useful function for us; it takes two parsers (`self` and `other`) and a function. It creates a new parser that first executes `self` on the input text, and then it executes `other` on the remaining text after `self`'s match. Then it uses `function` to combine the two matches, and returns that combination along with the remaining text. We're also going to define a few functions that call combine with a particular function.
 
 ```python
     def concat(self, other):
@@ -666,47 +624,13 @@ match_a.last(match_b)
 match_a.tuple(match_b)
 ```
 
-We also have a few other important functions that we use to build more complex parsers.
-
-```python
-    def choice(self,other):
-        
-        def choice_func(text):
-            return self(text).recover(lambda: other(text))
-        
-        return Parser(choice_func)
-```
+We also have a few other important functions that we use to build more complex parsers. I haven't included their code here, because I think that understanding `combine` is the most important code here, and I don't want to get bogged down in too many details.
 
 `choice` implements the ability to try one parser, and if it fails, recover by trying another. Be careful with this one, because it only operates locally. If you try and match __x__ or __y__, and __x__ succeeds in matching the text but puts you in a corner that causes failure later on, it won't backtrack and try __y__. It will only backtrack and try __y__ if matching __x__ fails.
 
-```python
-    def many(self, function=lambda x,y: x + y):
-        
-        def repeat_func(text):
-            res = self(text)
-            
-            if res.is_error():
-                return Result.ok(('',text))
-            
-            match = res.unwrap()[0]
-            rest = res.unwrap()[1]
-            
-            res = self(rest)
-            
-            while res.is_ok():
-                match = function(match, res.unwrap()[0])
-                rest = res.unwrap()[1]
-                res = self(rest)
-            
-            return Result.ok((match, rest))
-            
-        return Parser(repeat_func)
-        
-    def many1(self, function=lambda x,y: x + y):
-        return self.combine(self.many(function), function)
-```
+`many` is perhaps the most complicated constructor. What we want to do is continually match one parser, using a function to combine the results, until a failure occurs; but when a failure occurs, we want to ignore the failure and return that previous match. We also implement `many1` that matches one or more examples of an object, not zero or more like `many`.
 
-`many` is perhaps the most complicated constructor. What we want to do is continually match one parser, using a function to combine the results, until a failure occurs; but when a failure occurs, we want to ignore the failure and return that previous match. We also have a useful `many1` function, which is the same as `many` but demands that at least one match succeeds.
+There is also a variant of `many` called `many_list`, which instead of combining them by concatenating them, like `many` does, simply collects a list of all of the many matches.
 
 ```python
     def optional(self):
@@ -716,28 +640,6 @@ We also have a few other important functions that we use to build more complex p
 Finally, `optional` tries to match the input text with `self`, but if it fails, it matches nothing and finishes.
 
 Finally, we add symbolic versions of many of the above functions. This is purely for ease of reading the expressions we will write; you will see that they can get pretty complex, and `this.concat(that)` is harder to understand at a glance than `this + that`.
-
-```python
-    # |
-    def __or__(self, other):
-        return self.choice(other)
-
-    # +
-    def __add__(self, other):
-        return self.concat(other)
-
-    # =>
-    def __ge__(self, other):
-        return self.last(other)
-    
-    # <=
-    def __le__(self, other):
-        return self.first(other)
-
-    # &
-    def __and__(self, other):
-        return self.tuple(other)
-```
 
 Now we can move on to the Monadic functions.
 
@@ -759,45 +661,35 @@ Now we can move on to the Monadic functions.
  * `bind_func` takes the result, and passes the matched value through the function passed in to the Parser's bind function. This gives us a Result Monad, and we pull out it's value (if it exists).
  * Then we build the new Result Monad holding `(matched value, remainder of text)`, except now the matched value is the result of `function`.
  
-__*EXPLAIN WHAT BIND DOES AT A HIGH LEVEL*__
+We're also going to use `bind` to define `fmap`.
 
 ```python
     def fmap(self, function):
         return self.bind(lambda x: Result.ok(function(x)))
 ```
 
-We're also going to introduce a new function very similar to `bind` called `fmap`. This function is the same as `bind`, but it takes a function that can't fail and uses that to modify the matched value. We could always write out `bind(lambda x: Result.ok(function(x)))` for this, but it's nice to have it packaged up in a method, because then we can bind it to a symbol.
+The high level understanding of `bind` and `fmap` comes from the view of the Parsing Combinator as holding both an already parsed value, and the remainder of the string to be parsed. `bind` and `fmap` operate on the already parsed value, and don't alter the remaining string to be parsed.
 
-```python
-    # >>
-    def __rshift__(self, function):
-        return self.bind(function)
-    
-    # >
-    def __gt__(self, function):
-        return self.fmap(function)
-```
+Here is a full table of which functions I have bound to which symbols:
 
-Finally, let's write some functions that actually call the parser on some strings.
+ symbol  |  function
+--------:|---------
+`+`      | `concat`
+`<=`     | `first`
+`=>`     | `last`
+`&`      | `tuple`
+`>>`     | `bind`
+`>`      | `fmap`
 
-```python
-    def parse_prefix(self, string):
-        return self(string)
+There are also many constructors available, so here's a list of them and a brief description of what they do.
 
-    def parse_total(self, string):
-        
-        def check_full(tup):
-            if tup[1] == '':
-                return Result.ok(tup[0])
-            else:
-                return Result.error('The match did not consist '
-                    'of the entire string: {} was left over'.format(
-                    repr(tup[1])))
-            
-        return self(string) >> check_full
-```
+ constructor  |  description
+--------------|---------
+`char`        | Matches the character that is passed into it
+`oneof`       | Matches any one of the characters passed in as a string or list
+`empty`       | Matches nothing
+`noneof`      | Matches any character not passed in as a string or list
 
-These two functions help make it easier to use the parser; instead of calling the parser ourself, we use these functions to parse either a prefix of the string using our parser, or the entire string.
 
 ## Using the Parser Combinator
 
@@ -809,13 +701,13 @@ A number can be as simple as `12` or as complex as `12.00123e45`, so we're going
 digits = Parser.oneof('0123456789').many1()
 ```
 
-Now, we need to express an optional decimal place, followed by one of more digits.
+Now, we need to express an optional decimal place, followed by one of more digits. Remember, the `+` will parse one, and then the other, and then concatenate their results.
 
 ```python
 decimal = (Parser.char('.') + digits).optional()
 ```
 
-Now, we need an exponent part, which is pretty simple given the above. However, we do need one additional component, a sign.
+Now, we need an exponent part, which is pretty simple given the above. However, we do need one additional component, a sign. The `|` symbol will parse one or the other of the two things on either side of it.
 
 ```python
 sign = (Parser.char('+') | Parser.char('-')).optional()
@@ -872,6 +764,8 @@ Parser.parse_total(number, '7.22345e10') >> result_float
 
 Everything we've done so far can basically be done in the exact same way by regular expressions. However, because of the way we've defined the Parsing Combinator, we can use `bind` and `fmap` inside of Parsing Combinator expressions. This allows us to parse complex expressions into fully formed and entirely arbitrary python objects.
 
+### List of Numbers Parser
+
 ```python
 number = (sign + digits + decimal + exponent) >> result_float
 ```
@@ -883,16 +777,16 @@ whitespace = Parser.oneof(' \n').many1()
 
 # without infix operators
 many_numbers = (
-    (whitespace.optional().last(number)).fmap(lambda x: [x])
-    ).many()
+    (whitespace.optional().last(number))
+    ).many_list()
 
 # with infix operators
 many_numbers = (
-        (whitespace.optional() >= number) > (lambda x: [x])
-    ).many()
+        (whitespace.optional() >= number)
+    ).many_list()
 ```
 
-Let me take this text and expand it into English. This reads 'If there's any whitespace, match it and discard it, and parse a number following it. Then, put that number in a list, and repeat until parsing fails. Then combine all of the lists (via concatenation), and return that.' And this works perfectly, 100% in pure standard python, with no `eval` or `exec` statements. And you absolutely cannot do this with regular expressions.
+Let me take this text and expand it into English. This reads 'If there's any whitespace, match it and discard it, and parse a number following it. Then, put that number in a list, and repeat until parsing fails. Then combine all of the lists (via concatenation), and return that.' And this works perfectly, in pure and standard python, with no `eval` or `exec` statements. And it is simpler than doing this with regular expressions.
 
 ```python
 text = '2.12345e+100 2.1e10 1223 13.5 100e100'
@@ -900,15 +794,18 @@ print(Parser.parse_total(many_numbers, text))
 # Ok([2.12345e+100, 21000000000.0, 1223.0, 13.5, 1e+102])
 ```
 
+### CSV Parser
+
 Parsing Combinators can be used to write powerful, modular, readable, and concise parsers for any format of text. For example, here is a CSV parser in 5 lines of code.
 
 ```python
 expression = Parser.noneof(',\n').many1()
 comma = Parser.char(',')
 newline = Parser.char('\n')
-line = ((expression <= comma.optional()) > lambda x: [x]).many()
-csv = ((line <= newline.optional()) > (lambda x: [x])).many()
+line = (expression <= comma.optional()).many_list()
+csv = (line <= newline.optional()).many_list()
 
+# Example
 text = '''1,2,3,4,5
 hello world, my, good, friends, 5
 0,1,2,3,4'''
@@ -922,6 +819,8 @@ print(csv.parse_total(text))
 #     ]
 # )
 ```
+
+### Abstract Syntax Tree Parser
 
 And finally, here is a full arithmetic expression parser. This is more powerful than the power of regular expressions to break a string into tokens. It constructs the full AST from a purely textual input, just using a Parser Combinator. You'll notice that at this point, I need to define a function and pass that in to a Parser; we need to do this because this is a recursive expression we are parsing. However, it doesn't actually add to the complexity too much.
 
@@ -994,6 +893,8 @@ print(Parser(expr).parse_total(text))
 # )
 ```
 
+I decided to reproduce this sort of code using standard regular expressions; Not only did that version have twice as many lines, it was a much more fragile program. I didn't thoroughly test it, but its behavior when given wrong input wasn't well defined, and there were edge cases that might result in malformed results. The Parsing Combinator above, however, is short and will always return an Error Result with a sensible error message if an error happens.
+
 # Theory of Monads
 
 Now that we've seen a few examples of what a Monad is, we can talk about the formal definition. This is going to be the most abstract section of the text, but I'll try and keep any statements from category theory or abstract algebra from appearing here.
@@ -1035,7 +936,7 @@ def join(monad):
     monad.bind(lambda x: x.unwrap() if x.is_some() else x)
 ```
 
-This means, for our purposes, for something to be a Monad, we require it to either have both `fmap` and `join` *or* `bind`.
+This means, for our purposes, for something to be a Monad, we require it to either have both `fmap` *and* `join`, or `bind`.
 
 ## Monad Laws
 
@@ -1261,4 +1162,211 @@ result = (
     )
 
 print(result)
+```
+
+# Code: The Parsing Combinator
+
+```python
+class Parser:
+    def __init__(self, function):
+        self._function = function
+        
+    def __call__(self, text):
+        x = self._function(text)
+        return x
+
+    def __repr__(self):
+        return '<Parsing Combinator>'
+            
+    def bind(self, function):
+        
+        def bind_func(result):
+            return function(result[0]).bind(lambda x: Result.ok((x, result[1])))
+
+        return Parser(lambda text: self(text).bind(bind_func))
+    
+    def fmap(self, function):
+        return self.bind(lambda x: Result.ok(function(x)))
+    
+    def combine(self, other, function):
+        
+        def combine_func(match, rest):
+            res = other(rest)
+            if res.is_ok():
+                other_match, rest = res.unwrap()
+                new_match = function(match, other_match)
+                return Result.ok((new_match, rest))
+            else:
+                return res
+            
+        return Parser(lambda text: self(text).bind(lambda res: combine_func(*res)))
+    
+    def concat(self, other):
+        return self.combine(other, lambda x, y: x + y)
+    
+    def choice(self,other):
+        
+        def choice_func(text):
+            return self(text).recover(lambda: other(text))
+        
+        return Parser(choice_func)
+    
+    def many(self, function=lambda x,y: x + y):
+        
+        def repeat_func(text):
+            res = self(text)
+            
+            if res.is_error():
+                return Result.ok(('',text))
+            
+            match = res.unwrap()[0]
+            rest = res.unwrap()[1]
+            
+            res = self(rest)
+            
+            while res.is_ok():
+                match = function(match, res.unwrap()[0])
+                rest = res.unwrap()[1]
+                res = self(rest)
+            
+            return Result.ok((match, rest))
+            
+        return Parser(repeat_func)
+    
+    def many_list(self):
+        
+        def repeat_func(text):
+            res = self(text)
+            
+            if res.is_error():
+                return Result.ok(('',text))
+            
+            match = [res.unwrap()[0]]
+            rest = res.unwrap()[1]
+            
+            res = self(rest)
+            
+            while res.is_ok():
+                match = match + [res.unwrap()[0]]
+                rest = res.unwrap()[1]
+                res = self(rest)
+            
+            return Result.ok((match, rest))
+            
+        return Parser(repeat_func)
+        
+    def many1(self, function=lambda x,y: x + y):
+        return self.combine(self.many(function), function)
+    
+    def many1_list(self):
+        return self.combine(self.many_list(function), function)
+    
+    def optional(self):
+        return self | Parser.empty()
+    
+    def first(self, other):
+        return self.combine(other, lambda x,y: x)
+    
+    def last(self, other):
+        return self.combine(other, lambda x,y: y)
+    
+    def tuple(self, other):
+        return self.combine(other, lambda x,y: (x,y))
+
+    def __rshift__(self, function):
+        return self.bind(function)
+    
+    def __gt__(self, function):
+        return self.fmap(function)
+    
+    def __ge__(self, other):
+        return self.last(other)
+    
+    def __le__(self, other):
+        return self.first(other)
+        
+    def __add__(self, other):
+        return self.concat(other)
+        
+    def __or__(self, other):
+        return self.choice(other)
+
+    def __and__(self, other):
+        return self.tuple(other)
+
+    @classmethod
+    def char(cls, val):
+
+        def match_char(text):
+            try:
+                current = text[0]
+            except IndexError:
+                return Result.error('End of String encountered, but ' +
+                    '{} is still expected'.format(repr(val)))
+            
+            if current == val:
+                return Result.ok((text[0], text[1:]))
+            else:
+                return Result.error('Failed to match character {} at {}'
+                    .format(repr(val), repr(text)))
+
+        return Parser(match_char)
+
+    @classmethod
+    def empty(cls):
+
+        def match_empty(text):
+            return Result.ok(('', text))
+
+        return Parser(match_empty)
+
+    @classmethod
+    def oneof(cls, charls):
+
+        def match_charls(text):
+            try:
+                current = text[0]
+            except IndexError:
+                return Result.error('End of String encountered, but one of ' +
+                '{} is still expected'.format(list(charls)))
+
+            if current in charls:
+                return Result.ok((text[0], text[1:]))
+            else:
+                return Result.error('Failed to match one of {} at {}'
+                    .format(list(charls), repr(text)))
+
+        return Parser(match_charls)
+
+    @classmethod
+    def noneof(cls, charls):
+
+        def none_charls(text):
+            try:
+                current = text[0]
+            except IndexError:
+                return Result.error('End of String encountered, but none of ' +
+                '{} is still expected'.format(repr(text)))
+
+            if current not in charls:
+                return Result.ok((text[0], text[1:]))
+            else:
+                return Result.error('Found one of {} at {} '
+                    +'when there should be none of'.format(list(charls), repr(text)))
+
+        return Parser(none_charls)
+
+    def parse_prefix(self, string):
+        return self(string)
+
+    def parse_total(self, string):
+        
+        def check_full(tup):
+            if tup[1] == '':
+                return Result.ok(tup[0])
+            else:
+                return Result.error('The match did not consist of the entire ' +
+                    'string: {} was left over'.format(repr(tup[1])))
+            
+        return self(string) >> check_full
 ```

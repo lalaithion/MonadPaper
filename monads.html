@@ -361,17 +361,15 @@ result <span class="op">=</span> <span class="bu">int</span>(temp2)</code></pre>
 <p>We're now going to talk about a Monad called the Parsing Combinator, which basically recreates and improves upon regular expressions using Monads. Here we see the truth of the oft said but little understood aphorism that Monads represent computation; here, they represent the computation of regular expressions.</p>
 <p>It's also worth noting that there are many python Parsing Combinator libraries on the python package index, and those will have faster, more powerful implementations than the one below.</p>
 <h2 id="the-code"><span class="header-section-number">3.1</span> The Code</h2>
+<p>Unlike the Option Monad, I'm not going to go over the entire codebase for the Parsing Combinator. I hope to provide enough context so that the inner workings aren't mysterious, but there is a lot of code (all in the appendix) and it is frankly quite dull at times.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">class</span> Parser:
     <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, function):
         <span class="va">self</span>._function <span class="op">=</span> function
         
     <span class="kw">def</span> <span class="fu">__call__</span>(<span class="va">self</span>, text, index):
-        <span class="cf">return</span> <span class="va">self</span>._function(text, index)
-
-    <span class="kw">def</span> <span class="fu">__repr__</span>(<span class="va">self</span>):
-        <span class="cf">return</span> <span class="st">&#39;&lt;Parsing Combinator&gt;&#39;</span></code></pre></div>
-<p>The basic idea behind our Parsing Combinator is that the Monad holds a function that takes a string, which we're going to call <code>text</code>, and it returns a Result Monad. If the result is a success, the Result Monad holds a tuple of the text that has matched the current parser, and the remainder of <code>text</code>. In order to make this a bit easier for us, we will implement the special method <code>__call__</code>, so that we can write stuff like <code>self(text)</code> instead of <code>self._function(text)</code> in the future. It's really hard to print functions meaningfully, so we're just going to define our representation as a constant string.</p>
-<p>I'm going to slightly deviate from our already established order to introduce the constructors first; then we can deal with the ways we can bind to and combine Parsing Combinators. These constructors will do two things; define a function, and then create a Parser using that function.</p>
+        <span class="cf">return</span> <span class="va">self</span>._function(text, index)</code></pre></div>
+<p>The basic idea behind our Parsing Combinator is that the Monad holds a function that takes a string, which we're going to call <code>text</code>, and it returns a Result Monad. If the result is a success, the Result Monad holds a tuple of the text that has matched the current parser, and the remainder of <code>text</code>. In order to make this a bit easier for us, we will implement the special method <code>__call__</code>, so that we can write stuff like <code>self(text)</code> instead of <code>self._function(text)</code> in the future.</p>
+<p>Before we jump into all of the super complex functions, let's look at a basic constructor for this Parser Monad.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="at">@classmethod</span>
     <span class="kw">def</span> char(cls, val):
 
@@ -379,62 +377,18 @@ result <span class="op">=</span> <span class="bu">int</span>(temp2)</code></pre>
             <span class="cf">try</span>:
                 current <span class="op">=</span> text[<span class="dv">0</span>]
             <span class="cf">except</span> <span class="pp">IndexError</span>:
-                <span class="cf">return</span> Result.error(<span class="st">&#39;End of String encountered&#39;</span>
-                    <span class="co">&#39;, but {} is still expected&#39;</span>.<span class="bu">format</span>(<span class="bu">repr</span>(val)))
+                <span class="cf">return</span> Result.error(<span class="st">&#39;End of String encountered, but &#39;</span> <span class="op">+</span>
+                    <span class="co">&#39;{} is still expected&#39;</span>.<span class="bu">format</span>(<span class="bu">repr</span>(val)))
             
             <span class="cf">if</span> current <span class="op">==</span> val:
                 <span class="cf">return</span> Result.ok((text[<span class="dv">0</span>], text[<span class="dv">1</span>:]))
             <span class="cf">else</span>:
-                <span class="cf">return</span> Result.error(<span class="st">&#39;Failed to match character&#39;</span> <span class="op">+</span>
-                    <span class="co">&#39; {} at {}&#39;</span>.<span class="bu">format</span>(<span class="bu">repr</span>(val), <span class="bu">repr</span>(text)))
+                <span class="cf">return</span> Result.error(<span class="st">&#39;Failed to match character {} at {}&#39;</span>
+                    .<span class="bu">format</span>(<span class="bu">repr</span>(val), <span class="bu">repr</span>(text)))
 
-        <span class="cf">return</span> Parser(match_char)
-
-    <span class="at">@classmethod</span>
-    <span class="kw">def</span> empty(cls):
-
-        <span class="kw">def</span> match_empty(text):
-            <span class="cf">return</span> Result.ok((<span class="st">&#39;&#39;</span>, text))
-
-        <span class="cf">return</span> Parser(match_empty)
-
-    <span class="at">@classmethod</span>
-    <span class="kw">def</span> oneof(cls, charls):
-
-        <span class="kw">def</span> match_charls(text):
-            <span class="cf">try</span>:
-                current <span class="op">=</span> text[<span class="dv">0</span>]
-            <span class="cf">except</span> <span class="pp">IndexError</span>:
-                <span class="cf">return</span> Result.error(<span class="st">&#39;End of String encountered, but &#39;</span>
-                    <span class="co">&#39;one of {} is still expected&#39;</span>.<span class="bu">format</span>(<span class="bu">list</span>(charls)))
-
-            <span class="cf">if</span> current <span class="op">in</span> charls:
-                <span class="cf">return</span> Result.ok((text[<span class="dv">0</span>], text[<span class="dv">1</span>:]))
-            <span class="cf">else</span>:
-                <span class="cf">return</span> Result.error(<span class="st">&#39;Failed to match one of {} at {}&#39;</span>
-                    .<span class="bu">format</span>(<span class="bu">list</span>(charls), <span class="bu">repr</span>(text)))
-
-        <span class="cf">return</span> Parser(match_charls)
-
-    <span class="at">@classmethod</span>
-    <span class="kw">def</span> noneof(cls, charls):
-
-        <span class="kw">def</span> none_charls(text):
-            <span class="cf">try</span>:
-                current <span class="op">=</span> text[<span class="dv">0</span>]
-            <span class="cf">except</span> <span class="pp">IndexError</span>:
-                <span class="cf">return</span> Result.error(<span class="st">&#39;End of String encountered,&#39;</span>
-                    <span class="co">&#39; but none of {} is still expected&#39;</span>.<span class="bu">format</span>(<span class="bu">repr</span>(text)))
-
-            <span class="cf">if</span> current <span class="op">not</span> <span class="op">in</span> charls:
-                <span class="cf">return</span> Result.ok((text[<span class="dv">0</span>], text[<span class="dv">1</span>:]))
-            <span class="cf">else</span>:
-                <span class="cf">return</span> Result.error(<span class="st">&#39;Found one of&#39;</span>
-                    <span class="co">&#39; {} at {} when there should be none of&#39;</span>.<span class="bu">format</span>(
-                    <span class="bu">list</span>(charls), <span class="bu">repr</span>(text)))
-
-        <span class="cf">return</span> Parser(none_charls)</code></pre></div>
-<p>These all follow fairly simple rules; they are the equivalent of some fairly basic regular expressions. The first one tries to compare the first character of the text to a character, and if it can, it pulls that character off of the text, and returns the character and the remainder as the result. The second one does absolutely nothing to the input text, simply returning the empty string and the input unchanged. The third and fourth represent character classes, but still match exactly one character from the beginning of the text. To do advanced parsing, we're going to need some more advanced constructors; ones that combine other parsers into new parsers.</p>
+        <span class="cf">return</span> Parser(match_char)</code></pre></div>
+<p>This constructor creates a Parser with the function <code>match_char</code>. If we look at <code>match_char</code>, despite its length, it is a very simple function. First, it tries to see what the first character in the string (<code>current</code>) is, checking for an error (and returning an Error Result Monad) if there is one. Then, it compares <code>current</code> to the value that was passed into the constructor, and sees if it matches. If it does match, then it returns an Ok Result, with the parsed value being the character, and the remaining text being the rest of the text, from the parsed character on.</p>
+<p>Now that we've seen a way to construct this Monad, let's look at how to combine simple Parsing Combinators into more complex ones.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="kw">def</span> combine(<span class="va">self</span>, other, function):
         
         <span class="kw">def</span> combine_func(match, rest):
@@ -446,9 +400,11 @@ result <span class="op">=</span> <span class="bu">int</span>(temp2)</code></pre>
             <span class="cf">else</span>:
                 <span class="cf">return</span> res
             
-        <span class="cf">return</span> Parser(<span class="kw">lambda</span> text: <span class="va">self</span>(text)
-            .bind(<span class="kw">lambda</span> res: combine_func(<span class="op">*</span>res)))</code></pre></div>
-<p><code>combine</code> is the most useful function for us; it takes two parsers (<code>self</code> and <code>other</code>) and a function. It creates a new parser that first executes <code>self</code> on the input text, and then it executes <code>other</code> on the remaining text after <code>self</code>'s match. Then it uses <code>function</code> to combine the two matches, and returns that combination along with the remaining text. We're also going to define a few functions that call combine with a particular function</p>
+        <span class="cf">return</span> (
+              Parser(<span class="kw">lambda</span> text: <span class="va">self</span>(text)
+                .bind(<span class="kw">lambda</span> res: combine_func(<span class="op">*</span>res)))
+            )</code></pre></div>
+<p><code>combine</code> is the most useful function for us; it takes two parsers (<code>self</code> and <code>other</code>) and a function. It creates a new parser that first executes <code>self</code> on the input text, and then it executes <code>other</code> on the remaining text after <code>self</code>'s match. Then it uses <code>function</code> to combine the two matches, and returns that combination along with the remaining text. We're also going to define a few functions that call combine with a particular function.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="kw">def</span> concat(<span class="va">self</span>, other):
         <span class="cf">return</span> <span class="va">self</span>.combine(other, <span class="kw">lambda</span> x,y: x <span class="op">+</span> y)
         
@@ -475,62 +431,14 @@ match_a.last(match_b)
 
 <span class="co"># This will match the string &#39;ab&#39; and return the tuple (&#39;a&#39;,&#39;b&#39;)</span>
 match_a.<span class="bu">tuple</span>(match_b)</code></pre></div>
-<p>We also have a few other important functions that we use to build more complex parsers.</p>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="kw">def</span> choice(<span class="va">self</span>,other):
-        
-        <span class="kw">def</span> choice_func(text):
-            <span class="cf">return</span> <span class="va">self</span>(text).recover(<span class="kw">lambda</span>: other(text))
-        
-        <span class="cf">return</span> Parser(choice_func)</code></pre></div>
+<p>We also have a few other important functions that we use to build more complex parsers. I haven't included their code here, because I think that understanding <code>combine</code> is the most important code here, and I don't want to get bogged down in too many details.</p>
 <p><code>choice</code> implements the ability to try one parser, and if it fails, recover by trying another. Be careful with this one, because it only operates locally. If you try and match <strong>x</strong> or <strong>y</strong>, and <strong>x</strong> succeeds in matching the text but puts you in a corner that causes failure later on, it won't backtrack and try <strong>y</strong>. It will only backtrack and try <strong>y</strong> if matching <strong>x</strong> fails.</p>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="kw">def</span> many(<span class="va">self</span>, function<span class="op">=</span><span class="kw">lambda</span> x,y: x <span class="op">+</span> y):
-        
-        <span class="kw">def</span> repeat_func(text):
-            res <span class="op">=</span> <span class="va">self</span>(text)
-            
-            <span class="cf">if</span> res.is_error():
-                <span class="cf">return</span> Result.ok((<span class="st">&#39;&#39;</span>,text))
-            
-            match <span class="op">=</span> res.unwrap()[<span class="dv">0</span>]
-            rest <span class="op">=</span> res.unwrap()[<span class="dv">1</span>]
-            
-            res <span class="op">=</span> <span class="va">self</span>(rest)
-            
-            <span class="cf">while</span> res.is_ok():
-                match <span class="op">=</span> function(match, res.unwrap()[<span class="dv">0</span>])
-                rest <span class="op">=</span> res.unwrap()[<span class="dv">1</span>]
-                res <span class="op">=</span> <span class="va">self</span>(rest)
-            
-            <span class="cf">return</span> Result.ok((match, rest))
-            
-        <span class="cf">return</span> Parser(repeat_func)
-        
-    <span class="kw">def</span> many1(<span class="va">self</span>, function<span class="op">=</span><span class="kw">lambda</span> x,y: x <span class="op">+</span> y):
-        <span class="cf">return</span> <span class="va">self</span>.combine(<span class="va">self</span>.many(function), function)</code></pre></div>
-<p><code>many</code> is perhaps the most complicated constructor. What we want to do is continually match one parser, using a function to combine the results, until a failure occurs; but when a failure occurs, we want to ignore the failure and return that previous match. We also have a useful <code>many1</code> function, which is the same as <code>many</code> but demands that at least one match succeeds.</p>
+<p><code>many</code> is perhaps the most complicated constructor. What we want to do is continually match one parser, using a function to combine the results, until a failure occurs; but when a failure occurs, we want to ignore the failure and return that previous match. We also implement <code>many1</code> that matches one or more examples of an object, not zero or more like <code>many</code>.</p>
+<p>There is also a variant of <code>many</code> called <code>many_list</code>, which instead of combining them by concatenating them, like <code>many</code> does, simply collects a list of all of the many matches.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="kw">def</span> optional(<span class="va">self</span>):
         <span class="cf">return</span> <span class="va">self</span>.choice(Parser.empty())</code></pre></div>
 <p>Finally, <code>optional</code> tries to match the input text with <code>self</code>, but if it fails, it matches nothing and finishes.</p>
 <p>Finally, we add symbolic versions of many of the above functions. This is purely for ease of reading the expressions we will write; you will see that they can get pretty complex, and <code>this.concat(that)</code> is harder to understand at a glance than <code>this + that</code>.</p>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="co"># |</span>
-    <span class="kw">def</span> <span class="fu">__or__</span>(<span class="va">self</span>, other):
-        <span class="cf">return</span> <span class="va">self</span>.choice(other)
-
-    <span class="co"># +</span>
-    <span class="kw">def</span> <span class="fu">__add__</span>(<span class="va">self</span>, other):
-        <span class="cf">return</span> <span class="va">self</span>.concat(other)
-
-    <span class="co"># =&gt;</span>
-    <span class="kw">def</span> <span class="fu">__ge__</span>(<span class="va">self</span>, other):
-        <span class="cf">return</span> <span class="va">self</span>.last(other)
-    
-    <span class="co"># &lt;=</span>
-    <span class="kw">def</span> <span class="fu">__le__</span>(<span class="va">self</span>, other):
-        <span class="cf">return</span> <span class="va">self</span>.first(other)
-
-    <span class="co"># &amp;</span>
-    <span class="kw">def</span> <span class="fu">__and__</span>(<span class="va">self</span>, other):
-        <span class="cf">return</span> <span class="va">self</span>.<span class="bu">tuple</span>(other)</code></pre></div>
 <p>Now we can move on to the Monadic functions.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="kw">def</span> bind(<span class="va">self</span>, function):
         
@@ -547,40 +455,79 @@ match_a.<span class="bu">tuple</span>(match_b)</code></pre></div>
 <li><code>bind_func</code> takes the result, and passes the matched value through the function passed in to the Parser's bind function. This gives us a Result Monad, and we pull out it's value (if it exists).</li>
 <li>Then we build the new Result Monad holding <code>(matched value, remainder of text)</code>, except now the matched value is the result of <code>function</code>.</li>
 </ul>
-<p><strong><em>EXPLAIN WHAT BIND DOES AT A HIGH LEVEL</em></strong></p>
+<p>We're also going to use <code>bind</code> to define <code>fmap</code>.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="kw">def</span> fmap(<span class="va">self</span>, function):
         <span class="cf">return</span> <span class="va">self</span>.bind(<span class="kw">lambda</span> x: Result.ok(function(x)))</code></pre></div>
-<p>We're also going to introduce a new function very similar to <code>bind</code> called <code>fmap</code>. This function is the same as <code>bind</code>, but it takes a function that can't fail and uses that to modify the matched value. We could always write out <code>bind(lambda x: Result.ok(function(x)))</code> for this, but it's nice to have it packaged up in a method, because then we can bind it to a symbol.</p>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="co"># &gt;&gt;</span>
-    <span class="kw">def</span> <span class="fu">__rshift__</span>(<span class="va">self</span>, function):
-        <span class="cf">return</span> <span class="va">self</span>.bind(function)
-    
-    <span class="co"># &gt;</span>
-    <span class="kw">def</span> <span class="fu">__gt__</span>(<span class="va">self</span>, function):
-        <span class="cf">return</span> <span class="va">self</span>.fmap(function)</code></pre></div>
-<p>Finally, let's write some functions that actually call the parser on some strings.</p>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="kw">def</span> parse_prefix(<span class="va">self</span>, string):
-        <span class="cf">return</span> <span class="va">self</span>(string)
-
-    <span class="kw">def</span> parse_total(<span class="va">self</span>, string):
-        
-        <span class="kw">def</span> check_full(tup):
-            <span class="cf">if</span> tup[<span class="dv">1</span>] <span class="op">==</span> <span class="st">&#39;&#39;</span>:
-                <span class="cf">return</span> Result.ok(tup[<span class="dv">0</span>])
-            <span class="cf">else</span>:
-                <span class="cf">return</span> Result.error(<span class="st">&#39;The match did not consist &#39;</span>
-                    <span class="co">&#39;of the entire string: {} was left over&#39;</span>.<span class="bu">format</span>(
-                    <span class="bu">repr</span>(tup[<span class="dv">1</span>])))
-            
-        <span class="cf">return</span> <span class="va">self</span>(string) <span class="op">&gt;&gt;</span> check_full</code></pre></div>
-<p>These two functions help make it easier to use the parser; instead of calling the parser ourself, we use these functions to parse either a prefix of the string using our parser, or the entire string.</p>
+<p>The high level understanding of <code>bind</code> and <code>fmap</code> comes from the view of the Parsing Combinator as holding both an already parsed value, and the remainder of the string to be parsed. <code>bind</code> and <code>fmap</code> operate on the already parsed value, and don't alter the remaining string to be parsed.</p>
+<p>Here is a full table of which functions I have bound to which symbols:</p>
+<table>
+<thead>
+<tr class="header">
+<th align="right">symbol</th>
+<th>function</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right"><code>+</code></td>
+<td><code>concat</code></td>
+</tr>
+<tr class="even">
+<td align="right"><code>&lt;=</code></td>
+<td><code>first</code></td>
+</tr>
+<tr class="odd">
+<td align="right"><code>=&gt;</code></td>
+<td><code>last</code></td>
+</tr>
+<tr class="even">
+<td align="right"><code>&amp;</code></td>
+<td><code>tuple</code></td>
+</tr>
+<tr class="odd">
+<td align="right"><code>&gt;&gt;</code></td>
+<td><code>bind</code></td>
+</tr>
+<tr class="even">
+<td align="right"><code>&gt;</code></td>
+<td><code>fmap</code></td>
+</tr>
+</tbody>
+</table>
+<p>There are also many constructors available, so here's a list of them and a brief description of what they do.</p>
+<table>
+<thead>
+<tr class="header">
+<th>constructor</th>
+<th>description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>char</code></td>
+<td>Matches the character that is passed into it</td>
+</tr>
+<tr class="even">
+<td><code>oneof</code></td>
+<td>Matches any one of the characters passed in as a string or list</td>
+</tr>
+<tr class="odd">
+<td><code>empty</code></td>
+<td>Matches nothing</td>
+</tr>
+<tr class="even">
+<td><code>noneof</code></td>
+<td>Matches any character not passed in as a string or list</td>
+</tr>
+</tbody>
+</table>
 <h2 id="using-the-parser-combinator"><span class="header-section-number">3.2</span> Using the Parser Combinator</h2>
 <p>Now we have a powerful enough Parser Monad to recreate all of the flexibility and power of regular expressions. We can combine parsers to make more complex ones, we can define functions that return parsers that recreate common regular expressions syntax, so let's try parsing something simple; let's try and write a Parser Combinator that parses numbers.</p>
 <p>A number can be as simple as <code>12</code> or as complex as <code>12.00123e45</code>, so we're going to need to build up a complex parser. Let's start with creating a parser that parses 1 or more of consecutive digits.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">digits <span class="op">=</span> Parser.oneof(<span class="st">&#39;0123456789&#39;</span>).many1()</code></pre></div>
-<p>Now, we need to express an optional decimal place, followed by one of more digits.</p>
+<p>Now, we need to express an optional decimal place, followed by one of more digits. Remember, the <code>+</code> will parse one, and then the other, and then concatenate their results.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">decimal <span class="op">=</span> (Parser.char(<span class="st">&#39;.&#39;</span>) <span class="op">+</span> digits).optional()</code></pre></div>
-<p>Now, we need an exponent part, which is pretty simple given the above. However, we do need one additional component, a sign.</p>
+<p>Now, we need an exponent part, which is pretty simple given the above. However, we do need one additional component, a sign. The <code>|</code> symbol will parse one or the other of the two things on either side of it.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">sign <span class="op">=</span> (Parser.char(<span class="st">&#39;+&#39;</span>) <span class="op">|</span> Parser.char(<span class="st">&#39;-&#39;</span>)).optional()
 exponent <span class="op">=</span> ((Parser.char(<span class="st">&#39;e&#39;</span>) <span class="op">|</span> Parser.char(<span class="st">&#39;E&#39;</span>))
              <span class="op">+</span> sign <span class="op">+</span> digits).optional()</code></pre></div>
@@ -619,30 +566,33 @@ Parser.parse_total(number, <span class="st">&#39;7.22345e10&#39;</span>) <span c
     <span class="co"># Ok(72234500000.0)</span></code></pre></div>
 <h2 id="going-further"><span class="header-section-number">3.3</span> Going Further</h2>
 <p>Everything we've done so far can basically be done in the exact same way by regular expressions. However, because of the way we've defined the Parsing Combinator, we can use <code>bind</code> and <code>fmap</code> inside of Parsing Combinator expressions. This allows us to parse complex expressions into fully formed and entirely arbitrary python objects.</p>
+<h3 id="list-of-numbers-parser"><span class="header-section-number">3.3.1</span> List of Numbers Parser</h3>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">number <span class="op">=</span> (sign <span class="op">+</span> digits <span class="op">+</span> decimal <span class="op">+</span> exponent) <span class="op">&gt;&gt;</span> result_float</code></pre></div>
 <p>As above, we can put the cast to a float inside of the number parser, and it will automatically do the conversion whenever something is parsed. We can also take this further:</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">whitespace <span class="op">=</span> Parser.oneof(<span class="st">&#39; </span><span class="ch">\n</span><span class="st">&#39;</span>).many1()
 
 <span class="co"># without infix operators</span>
 many_numbers <span class="op">=</span> (
-    (whitespace.optional().last(number)).fmap(<span class="kw">lambda</span> x: [x])
-    ).many()
+    (whitespace.optional().last(number))
+    ).many_list()
 
 <span class="co"># with infix operators</span>
 many_numbers <span class="op">=</span> (
-        (whitespace.optional() <span class="op">&gt;=</span> number) <span class="op">&gt;</span> (<span class="kw">lambda</span> x: [x])
-    ).many()</code></pre></div>
-<p>Let me take this text and expand it into English. This reads 'If there's any whitespace, match it and discard it, and parse a number following it. Then, put that number in a list, and repeat until parsing fails. Then combine all of the lists (via concatenation), and return that.' And this works perfectly, 100% in pure standard python, with no <code>eval</code> or <code>exec</code> statements. And you absolutely cannot do this with regular expressions.</p>
+        (whitespace.optional() <span class="op">&gt;=</span> number)
+    ).many_list()</code></pre></div>
+<p>Let me take this text and expand it into English. This reads 'If there's any whitespace, match it and discard it, and parse a number following it. Then, put that number in a list, and repeat until parsing fails. Then combine all of the lists (via concatenation), and return that.' And this works perfectly, in pure and standard python, with no <code>eval</code> or <code>exec</code> statements. And it is simpler than doing this with regular expressions.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">text <span class="op">=</span> <span class="st">&#39;2.12345e+100 2.1e10 1223 13.5 100e100&#39;</span>
 <span class="bu">print</span>(Parser.parse_total(many_numbers, text))
 <span class="co"># Ok([2.12345e+100, 21000000000.0, 1223.0, 13.5, 1e+102])</span></code></pre></div>
+<h3 id="csv-parser"><span class="header-section-number">3.3.2</span> CSV Parser</h3>
 <p>Parsing Combinators can be used to write powerful, modular, readable, and concise parsers for any format of text. For example, here is a CSV parser in 5 lines of code.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">expression <span class="op">=</span> Parser.noneof(<span class="st">&#39;,</span><span class="ch">\n</span><span class="st">&#39;</span>).many1()
 comma <span class="op">=</span> Parser.char(<span class="st">&#39;,&#39;</span>)
 newline <span class="op">=</span> Parser.char(<span class="st">&#39;</span><span class="ch">\n</span><span class="st">&#39;</span>)
-line <span class="op">=</span> ((expression <span class="op">&lt;=</span> comma.optional()) <span class="op">&gt;</span> <span class="kw">lambda</span> x: [x]).many()
-csv <span class="op">=</span> ((line <span class="op">&lt;=</span> newline.optional()) <span class="op">&gt;</span> (<span class="kw">lambda</span> x: [x])).many()
+line <span class="op">=</span> (expression <span class="op">&lt;=</span> comma.optional()).many_list()
+csv <span class="op">=</span> (line <span class="op">&lt;=</span> newline.optional()).many_list()
 
+<span class="co"># Example</span>
 text <span class="op">=</span> <span class="st">&#39;&#39;&#39;1,2,3,4,5</span>
 <span class="st">hello world, my, good, friends, 5</span>
 <span class="st">0,1,2,3,4&#39;&#39;&#39;</span>
@@ -655,6 +605,7 @@ text <span class="op">=</span> <span class="st">&#39;&#39;&#39;1,2,3,4,5</span>
 <span class="co">#         [&#39;0&#39;, &#39;1&#39;, &#39;2&#39;, &#39;3&#39;, &#39;4&#39;]</span>
 <span class="co">#     ]</span>
 <span class="co"># )</span></code></pre></div>
+<h3 id="abstract-syntax-tree-parser"><span class="header-section-number">3.3.3</span> Abstract Syntax Tree Parser</h3>
 <p>And finally, here is a full arithmetic expression parser. This is more powerful than the power of regular expressions to break a string into tokens. It constructs the full AST from a purely textual input, just using a Parser Combinator. You'll notice that at this point, I need to define a function and pass that in to a Parser; we need to do this because this is a recursive expression we are parsing. However, it doesn't actually add to the complexity too much.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="im">from</span> collections <span class="im">import</span> namedtuple
 <span class="im">from</span> enum <span class="im">import</span> Enum, auto
@@ -722,6 +673,7 @@ text <span class="op">=</span> <span class="st">&#39;((1+2) * (9 - 11))&#39;</sp
 <span class="co">#         )</span>
 <span class="co">#     )</span>
 <span class="co"># )</span></code></pre></div>
+<p>I decided to reproduce this sort of code using standard regular expressions; Not only did that version have twice as many lines, it was a much more fragile program. I didn't thoroughly test it, but its behavior when given wrong input wasn't well defined, and there were edge cases that might result in malformed results. The Parsing Combinator above, however, is short and will always return an Error Result with a sensible error message if an error happens.</p>
 <h1 id="theory-of-monads"><span class="header-section-number">4</span> Theory of Monads</h1>
 <p>Now that we've seen a few examples of what a Monad is, we can talk about the formal definition. This is going to be the most abstract section of the text, but I'll try and keep any statements from category theory or abstract algebra from appearing here.</p>
 <h2 id="defining-monads"><span class="header-section-number">4.1</span> Defining Monads</h2>
@@ -743,7 +695,7 @@ Option.none().join() <span class="op">==</span> Option.none()</code></pre></div>
 
 <span class="kw">def</span> join(monad):
     monad.bind(<span class="kw">lambda</span> x: x.unwrap() <span class="cf">if</span> x.is_some() <span class="cf">else</span> x)</code></pre></div>
-<p>This means, for our purposes, for something to be a Monad, we require it to either have both <code>fmap</code> and <code>join</code> <em>or</em> <code>bind</code>.</p>
+<p>This means, for our purposes, for something to be a Monad, we require it to either have both <code>fmap</code> <em>and</em> <code>join</code>, or <code>bind</code>.</p>
 <h2 id="monad-laws"><span class="header-section-number">4.2</span> Monad Laws</h2>
 <p>Now, Monads have three laws, or rules, they have to follow; this is just to make sure Monads don't have any unexpected behavior, but we should go over those rules anyway.</p>
 <p>First of all, if you <code>fmap</code> over a Monad with the identity function (a function that returns its inputs unchanged), the value in the Monad doesn't change.</p>
@@ -936,3 +888,206 @@ result <span class="op">=</span> (
     )
 
 <span class="bu">print</span>(result)</code></pre></div>
+<h1 id="code-the-parsing-combinator"><span class="header-section-number">7</span> Code: The Parsing Combinator</h1>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">class</span> Parser:
+    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, function):
+        <span class="va">self</span>._function <span class="op">=</span> function
+        
+    <span class="kw">def</span> <span class="fu">__call__</span>(<span class="va">self</span>, text):
+        x <span class="op">=</span> <span class="va">self</span>._function(text)
+        <span class="cf">return</span> x
+
+    <span class="kw">def</span> <span class="fu">__repr__</span>(<span class="va">self</span>):
+        <span class="cf">return</span> <span class="st">&#39;&lt;Parsing Combinator&gt;&#39;</span>
+            
+    <span class="kw">def</span> bind(<span class="va">self</span>, function):
+        
+        <span class="kw">def</span> bind_func(result):
+            <span class="cf">return</span> function(result[<span class="dv">0</span>]).bind(<span class="kw">lambda</span> x: Result.ok((x, result[<span class="dv">1</span>])))
+
+        <span class="cf">return</span> Parser(<span class="kw">lambda</span> text: <span class="va">self</span>(text).bind(bind_func))
+    
+    <span class="kw">def</span> fmap(<span class="va">self</span>, function):
+        <span class="cf">return</span> <span class="va">self</span>.bind(<span class="kw">lambda</span> x: Result.ok(function(x)))
+    
+    <span class="kw">def</span> combine(<span class="va">self</span>, other, function):
+        
+        <span class="kw">def</span> combine_func(match, rest):
+            res <span class="op">=</span> other(rest)
+            <span class="cf">if</span> res.is_ok():
+                other_match, rest <span class="op">=</span> res.unwrap()
+                new_match <span class="op">=</span> function(match, other_match)
+                <span class="cf">return</span> Result.ok((new_match, rest))
+            <span class="cf">else</span>:
+                <span class="cf">return</span> res
+            
+        <span class="cf">return</span> Parser(<span class="kw">lambda</span> text: <span class="va">self</span>(text).bind(<span class="kw">lambda</span> res: combine_func(<span class="op">*</span>res)))
+    
+    <span class="kw">def</span> concat(<span class="va">self</span>, other):
+        <span class="cf">return</span> <span class="va">self</span>.combine(other, <span class="kw">lambda</span> x, y: x <span class="op">+</span> y)
+    
+    <span class="kw">def</span> choice(<span class="va">self</span>,other):
+        
+        <span class="kw">def</span> choice_func(text):
+            <span class="cf">return</span> <span class="va">self</span>(text).recover(<span class="kw">lambda</span>: other(text))
+        
+        <span class="cf">return</span> Parser(choice_func)
+    
+    <span class="kw">def</span> many(<span class="va">self</span>, function<span class="op">=</span><span class="kw">lambda</span> x,y: x <span class="op">+</span> y):
+        
+        <span class="kw">def</span> repeat_func(text):
+            res <span class="op">=</span> <span class="va">self</span>(text)
+            
+            <span class="cf">if</span> res.is_error():
+                <span class="cf">return</span> Result.ok((<span class="st">&#39;&#39;</span>,text))
+            
+            match <span class="op">=</span> res.unwrap()[<span class="dv">0</span>]
+            rest <span class="op">=</span> res.unwrap()[<span class="dv">1</span>]
+            
+            res <span class="op">=</span> <span class="va">self</span>(rest)
+            
+            <span class="cf">while</span> res.is_ok():
+                match <span class="op">=</span> function(match, res.unwrap()[<span class="dv">0</span>])
+                rest <span class="op">=</span> res.unwrap()[<span class="dv">1</span>]
+                res <span class="op">=</span> <span class="va">self</span>(rest)
+            
+            <span class="cf">return</span> Result.ok((match, rest))
+            
+        <span class="cf">return</span> Parser(repeat_func)
+    
+    <span class="kw">def</span> many_list(<span class="va">self</span>):
+        
+        <span class="kw">def</span> repeat_func(text):
+            res <span class="op">=</span> <span class="va">self</span>(text)
+            
+            <span class="cf">if</span> res.is_error():
+                <span class="cf">return</span> Result.ok((<span class="st">&#39;&#39;</span>,text))
+            
+            match <span class="op">=</span> [res.unwrap()[<span class="dv">0</span>]]
+            rest <span class="op">=</span> res.unwrap()[<span class="dv">1</span>]
+            
+            res <span class="op">=</span> <span class="va">self</span>(rest)
+            
+            <span class="cf">while</span> res.is_ok():
+                match <span class="op">=</span> match <span class="op">+</span> [res.unwrap()[<span class="dv">0</span>]]
+                rest <span class="op">=</span> res.unwrap()[<span class="dv">1</span>]
+                res <span class="op">=</span> <span class="va">self</span>(rest)
+            
+            <span class="cf">return</span> Result.ok((match, rest))
+            
+        <span class="cf">return</span> Parser(repeat_func)
+        
+    <span class="kw">def</span> many1(<span class="va">self</span>, function<span class="op">=</span><span class="kw">lambda</span> x,y: x <span class="op">+</span> y):
+        <span class="cf">return</span> <span class="va">self</span>.combine(<span class="va">self</span>.many(function), function)
+    
+    <span class="kw">def</span> many1_list(<span class="va">self</span>):
+        <span class="cf">return</span> <span class="va">self</span>.combine(<span class="va">self</span>.many_list(function), function)
+    
+    <span class="kw">def</span> optional(<span class="va">self</span>):
+        <span class="cf">return</span> <span class="va">self</span> <span class="op">|</span> Parser.empty()
+    
+    <span class="kw">def</span> first(<span class="va">self</span>, other):
+        <span class="cf">return</span> <span class="va">self</span>.combine(other, <span class="kw">lambda</span> x,y: x)
+    
+    <span class="kw">def</span> last(<span class="va">self</span>, other):
+        <span class="cf">return</span> <span class="va">self</span>.combine(other, <span class="kw">lambda</span> x,y: y)
+    
+    <span class="kw">def</span> <span class="bu">tuple</span>(<span class="va">self</span>, other):
+        <span class="cf">return</span> <span class="va">self</span>.combine(other, <span class="kw">lambda</span> x,y: (x,y))
+
+    <span class="kw">def</span> <span class="fu">__rshift__</span>(<span class="va">self</span>, function):
+        <span class="cf">return</span> <span class="va">self</span>.bind(function)
+    
+    <span class="kw">def</span> <span class="fu">__gt__</span>(<span class="va">self</span>, function):
+        <span class="cf">return</span> <span class="va">self</span>.fmap(function)
+    
+    <span class="kw">def</span> <span class="fu">__ge__</span>(<span class="va">self</span>, other):
+        <span class="cf">return</span> <span class="va">self</span>.last(other)
+    
+    <span class="kw">def</span> <span class="fu">__le__</span>(<span class="va">self</span>, other):
+        <span class="cf">return</span> <span class="va">self</span>.first(other)
+        
+    <span class="kw">def</span> <span class="fu">__add__</span>(<span class="va">self</span>, other):
+        <span class="cf">return</span> <span class="va">self</span>.concat(other)
+        
+    <span class="kw">def</span> <span class="fu">__or__</span>(<span class="va">self</span>, other):
+        <span class="cf">return</span> <span class="va">self</span>.choice(other)
+
+    <span class="kw">def</span> <span class="fu">__and__</span>(<span class="va">self</span>, other):
+        <span class="cf">return</span> <span class="va">self</span>.<span class="bu">tuple</span>(other)
+
+    <span class="at">@classmethod</span>
+    <span class="kw">def</span> char(cls, val):
+
+        <span class="kw">def</span> match_char(text):
+            <span class="cf">try</span>:
+                current <span class="op">=</span> text[<span class="dv">0</span>]
+            <span class="cf">except</span> <span class="pp">IndexError</span>:
+                <span class="cf">return</span> Result.error(<span class="st">&#39;End of String encountered, but &#39;</span> <span class="op">+</span>
+                    <span class="co">&#39;{} is still expected&#39;</span>.<span class="bu">format</span>(<span class="bu">repr</span>(val)))
+            
+            <span class="cf">if</span> current <span class="op">==</span> val:
+                <span class="cf">return</span> Result.ok((text[<span class="dv">0</span>], text[<span class="dv">1</span>:]))
+            <span class="cf">else</span>:
+                <span class="cf">return</span> Result.error(<span class="st">&#39;Failed to match character {} at {}&#39;</span>
+                    .<span class="bu">format</span>(<span class="bu">repr</span>(val), <span class="bu">repr</span>(text)))
+
+        <span class="cf">return</span> Parser(match_char)
+
+    <span class="at">@classmethod</span>
+    <span class="kw">def</span> empty(cls):
+
+        <span class="kw">def</span> match_empty(text):
+            <span class="cf">return</span> Result.ok((<span class="st">&#39;&#39;</span>, text))
+
+        <span class="cf">return</span> Parser(match_empty)
+
+    <span class="at">@classmethod</span>
+    <span class="kw">def</span> oneof(cls, charls):
+
+        <span class="kw">def</span> match_charls(text):
+            <span class="cf">try</span>:
+                current <span class="op">=</span> text[<span class="dv">0</span>]
+            <span class="cf">except</span> <span class="pp">IndexError</span>:
+                <span class="cf">return</span> Result.error(<span class="st">&#39;End of String encountered, but one of &#39;</span> <span class="op">+</span>
+                <span class="co">&#39;{} is still expected&#39;</span>.<span class="bu">format</span>(<span class="bu">list</span>(charls)))
+
+            <span class="cf">if</span> current <span class="op">in</span> charls:
+                <span class="cf">return</span> Result.ok((text[<span class="dv">0</span>], text[<span class="dv">1</span>:]))
+            <span class="cf">else</span>:
+                <span class="cf">return</span> Result.error(<span class="st">&#39;Failed to match one of {} at {}&#39;</span>
+                    .<span class="bu">format</span>(<span class="bu">list</span>(charls), <span class="bu">repr</span>(text)))
+
+        <span class="cf">return</span> Parser(match_charls)
+
+    <span class="at">@classmethod</span>
+    <span class="kw">def</span> noneof(cls, charls):
+
+        <span class="kw">def</span> none_charls(text):
+            <span class="cf">try</span>:
+                current <span class="op">=</span> text[<span class="dv">0</span>]
+            <span class="cf">except</span> <span class="pp">IndexError</span>:
+                <span class="cf">return</span> Result.error(<span class="st">&#39;End of String encountered, but none of &#39;</span> <span class="op">+</span>
+                <span class="co">&#39;{} is still expected&#39;</span>.<span class="bu">format</span>(<span class="bu">repr</span>(text)))
+
+            <span class="cf">if</span> current <span class="op">not</span> <span class="op">in</span> charls:
+                <span class="cf">return</span> Result.ok((text[<span class="dv">0</span>], text[<span class="dv">1</span>:]))
+            <span class="cf">else</span>:
+                <span class="cf">return</span> Result.error(<span class="st">&#39;Found one of {} at {} &#39;</span>
+                    <span class="op">+</span><span class="st">&#39;when there should be none of&#39;</span>.<span class="bu">format</span>(<span class="bu">list</span>(charls), <span class="bu">repr</span>(text)))
+
+        <span class="cf">return</span> Parser(none_charls)
+
+    <span class="kw">def</span> parse_prefix(<span class="va">self</span>, string):
+        <span class="cf">return</span> <span class="va">self</span>(string)
+
+    <span class="kw">def</span> parse_total(<span class="va">self</span>, string):
+        
+        <span class="kw">def</span> check_full(tup):
+            <span class="cf">if</span> tup[<span class="dv">1</span>] <span class="op">==</span> <span class="st">&#39;&#39;</span>:
+                <span class="cf">return</span> Result.ok(tup[<span class="dv">0</span>])
+            <span class="cf">else</span>:
+                <span class="cf">return</span> Result.error(<span class="st">&#39;The match did not consist of the entire &#39;</span> <span class="op">+</span>
+                    <span class="co">&#39;string: {} was left over&#39;</span>.<span class="bu">format</span>(<span class="bu">repr</span>(tup[<span class="dv">1</span>])))
+            
+        <span class="cf">return</span> <span class="va">self</span>(string) <span class="op">&gt;&gt;</span> check_full</code></pre></div>

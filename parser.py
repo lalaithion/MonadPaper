@@ -76,8 +76,6 @@ class Result:
 PARSER
 '''
 
-import inspect
-
 class Parser:
     def __init__(self, function):
         self._function = function
@@ -143,9 +141,34 @@ class Parser:
             return Result.ok((match, rest))
             
         return Parser(repeat_func)
+    
+    def many_list(self):
+        
+        def repeat_func(text):
+            res = self(text)
+            
+            if res.is_error():
+                return Result.ok(('',text))
+            
+            match = [res.unwrap()[0]]
+            rest = res.unwrap()[1]
+            
+            res = self(rest)
+            
+            while res.is_ok():
+                match = match + [res.unwrap()[0]]
+                rest = res.unwrap()[1]
+                res = self(rest)
+            
+            return Result.ok((match, rest))
+            
+        return Parser(repeat_func)
         
     def many1(self, function=lambda x,y: x + y):
         return self.combine(self.many(function), function)
+    
+    def many1_list(self):
+        return self.combine(self.many_list(function), function)
     
     def optional(self):
         return self | Parser.empty()
@@ -316,8 +339,8 @@ def result_float(x):
 
 whitespace = Parser.oneof(' \n').many1()
 many_numbers = (
-        (whitespace.optional() >= number) > (lambda x: [x])
-    ).many()
+        (whitespace.optional() >= number)
+    ).many_list()
 
 text = '2.12345e+100 2.1e10 1223 13.5 100e100'
 print(Parser.parse_total(many_numbers, text))
@@ -326,8 +349,8 @@ print(Parser.parse_total(many_numbers, text))
 expression = Parser.noneof(',\n').many1()
 comma = Parser.char(',')
 newline = Parser.char('\n')
-line = ((expression <= comma.optional()) > (lambda x: [x])).many()
-csv = ((line <= newline) > (lambda x: [x])).many()
+line = (expression <= comma.optional()).many_list()
+csv = ((line <= newline)).many_list()
 
 text = '''1,2,3,8,5
 hello world, my, good, friends, 5
