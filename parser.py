@@ -3,11 +3,6 @@
 '''
 RESULT
 '''
-
-
-class ResultException(Exception):
-    pass
-
 class Result:
     def __init__(self, failed, value, message):
         self._failed = failed
@@ -16,9 +11,9 @@ class Result:
 
     def __repr__(self):
         if self._failed:
-            return 'Result.error({})'.format(repr(self._message))
+            return 'Option.error({})'.format(repr(self._message))
         else:
-            return 'Result.ok({})'.format(repr(self._value))
+            return 'Option.ok({})'.format(repr(self._value))
 
     def __str__(self):
         if self._failed:
@@ -38,13 +33,13 @@ class Result:
         if self.is_ok():
             return self._value
         else:
-            raise ResultException('This Result is an Error')
+            raise Exception('This Result is an Error')
     
     def error_msg(self):
         if self.is_error():
             return self._message
         else:
-            raise ResultException('This Result is Ok')
+            raise Exception('This Result is Ok')
             
     def bind(self, function):
         if self.is_error():
@@ -52,6 +47,13 @@ class Result:
         
         val = self.unwrap()
         return function(val)
+        
+    def fmap(self, function):
+        if self.is_error():
+            return self
+            
+        val = self.unwrap()
+        return Result.ok(function(val))
     
     def recover(self, function):
         if self.is_error():
