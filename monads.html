@@ -463,36 +463,44 @@ match_a.<span class="bu">tuple</span>(match_b)</code></pre></div>
 <tr class="header">
 <th align="right">symbol</th>
 <th>function</th>
+<th>description</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td align="right"><code>+</code></td>
 <td><code>concat</code></td>
+<td>concatenates the parsed values</td>
 </tr>
 <tr class="even">
 <td align="right"><code>&lt;=</code></td>
 <td><code>first</code></td>
+<td>returns the parsed value of the first parser</td>
 </tr>
 <tr class="odd">
 <td align="right"><code>=&gt;</code></td>
 <td><code>last</code></td>
+<td>returns the parsed value of the last parser</td>
 </tr>
 <tr class="even">
 <td align="right"><code>&amp;</code></td>
 <td><code>tuple</code></td>
+<td>returns the parsed value of both parsers in a tuple</td>
 </tr>
 <tr class="odd">
 <td align="right"><code>&gt;&gt;</code></td>
 <td><code>bind</code></td>
+<td>applies the function to the parsed value</td>
 </tr>
 <tr class="even">
 <td align="right"><code>&gt;</code></td>
 <td><code>fmap</code></td>
+<td>applies the function to the parsed value</td>
 </tr>
 <tr class="odd">
 <td align="right"><code>|</code></td>
 <td><code>choice</code></td>
+<td>tries the first parser, and if it fails, tries the second</td>
 </tr>
 </tbody>
 </table>

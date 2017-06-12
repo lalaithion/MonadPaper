@@ -667,15 +667,15 @@ The high level understanding of `bind` and `fmap` comes from the view of the Par
 
 Here is a full table of which functions I have bound to which symbols:
 
- symbol  |  function
---------:|---------
-`+`      | `concat`
-`<=`     | `first`
-`=>`     | `last`
-`&`      | `tuple`
-`>>`     | `bind`
-`>`      | `fmap`
-`|`      | `choice`
+ symbol  |  function | description
+--------:|-----------|--------------
+`+`      | `concat`  | concatenates the parsed values
+`<=`     | `first`   | returns the parsed value of the first parser
+`=>`     | `last`    | returns the parsed value of the last parser
+`&`      | `tuple`   | returns the parsed value of both parsers in a tuple
+`>>`     | `bind`    | applies the function to the parsed value
+`>`      | `fmap`    | applies the function to the parsed value
+`|`      | `choice`  | tries the first parser, and if it fails, tries the second
 
 
 There are also many constructors available, so here's a list of them and a brief description of what they do.
