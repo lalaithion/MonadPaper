@@ -99,13 +99,21 @@ def index(ls, i):
         return Option.none()
     return Option.some(ls[i])
 
+def lift2(f):
+    return lambda a1: lambda a2: f(a1,a2)
+
+
+def apply(f, *args):
+    curr = f
+    for i in args:
+        curr = i.bind(curr)
+    return curr
+
 def divide_elements(ls, i1, i2):
     res1 = index(ls, i1)
     res2 = index(ls, i2)
     
-    partial = lambda x: lambda y: division(x,y)
-    
-    return res2.bind(res1.bind(partial))
+    return apply(lift2(division), res1, res2)
 
 print(divide_elements([1,2,3,0],1,2))
 

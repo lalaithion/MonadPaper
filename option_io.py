@@ -45,7 +45,7 @@ class Option:
         val = self.unwrap()
         return function(val)
     
-    def __or__(self, function):
+    def __rshift__(self, function):
         return self.bind(function)
 
     @classmethod
@@ -99,5 +99,33 @@ def option_int(s):
     return i
 
 
-result = (Option.some('text.txt') | option_open | option_read | (lambda x: option_match(r'\s*(\S*)', x)) | (lambda x: option_get_group(x, 1)) | option_int)
+result = (
+    Option.some('text.txt')
+      >> option_open
+      >> option_read
+      >> (lambda x: option_match(r'\s*(\S*)', x))
+      >> (lambda x: option_get_group(x, 1))
+      >> option_int
+    )
+
+
+def flow(*args):
+    # all of the arguments are the functions we are going to bind
+    def binding(monad):
+        for f in args:
+            monad = monad >> f
+        return monad
+    
+    return binding
+
+
+open_read_parse = flow(
+    option_open,
+    option_read,
+    (lambda x: option_match(r'\s*(\S*)', x)),
+    (lambda x: option_get_group(x, 1)),
+    option_int,
+)
+
 print(result)
+print(open_read_parse(Option.some('text.txt')))

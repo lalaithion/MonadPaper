@@ -89,6 +89,8 @@ class Parser:
             
     def bind(self, function):
         
+        print(function)
+        
         def bind_func(result):
             return function(result[0]).bind(lambda x: Result.ok((x, result[1])))
 
@@ -134,8 +136,10 @@ class Parser:
             res = self(rest)
             
             while res.is_ok():
-                match = function(match, res.unwrap()[0])
-                rest = res.unwrap()[1]
+                curr, rest = res.unwrap()
+                if curr == '':
+                    break
+                match = function(match, curr)
                 res = self(rest)
             
             return Result.ok((match, rest))
@@ -156,8 +160,10 @@ class Parser:
             res = self(rest)
             
             while res.is_ok():
-                match = match + [res.unwrap()[0]]
-                rest = res.unwrap()[1]
+                curr, rest = res.unwrap()
+                if curr == '':
+                    break
+                match = match + [curr]
                 res = self(rest)
             
             return Result.ok((match, rest))
@@ -207,6 +213,7 @@ class Parser:
     def char(cls, val):
 
         def match_char(text):
+            print(val, text)
             try:
                 current = text[0]
             except IndexError:
@@ -233,6 +240,7 @@ class Parser:
     def oneof(cls, charls):
 
         def match_charls(text):
+            print(charls, text)
             try:
                 current = text[0]
             except IndexError:
@@ -323,95 +331,206 @@ decimal = (Parser.char('.') + digits).optional()
 sign = (Parser.char('+') | Parser.char('-')).optional()
 exponent = ((Parser.char('e') | Parser.char('E')) + sign + digits).optional()
 number = (sign + digits + decimal + exponent) >> result_float
+#
+#print(Parser.parse_total(number, '-12'))
+#print(Parser.parse_total(number, '12e10'))
+#print(Parser.parse_total(number, '2.12345e+100'))
+#print(Parser.parse_total(number, 'hello world'))
+#print(Parser.parse_total(number, '99 bottles of beer on the wall'))
+#print(Parser.parse_total(number, ''))
+#
+#def result_float(x):
+#    try:
+#        return Result.ok(float(x))
+#    except Exception:
+#        return Result.error('Failed to cast to a float')
+#
+#whitespace = Parser.oneof(' \n').many1()
+#many_numbers = (
+#        (whitespace.optional() >= number)
+#    ).many_list()
+#
+#text = '2.12345e+100 2.1e10 1223 13.5 100e100'
+#print(Parser.parse_total(many_numbers, text))
+## Ok(([2.12345e+100, 21000000000.0, 1223.0, 13.5, 1e+102], ''))
+#
+#expression = Parser.noneof(',\n').many1()
+#comma = Parser.char(',')
+#newline = Parser.char('\n')
+#line = (expression <= comma.optional()).many_list()
+#csv = ((line <= newline)).many_list()
+#
+#text = '''1,2,3,8,5
+#hello world, my, good, friends, 5
+#0,1,2,3,4
+#'''
+#print(Parser.parse_total(csv, text))
+#
+#from collections import namedtuple
+#from enum import Enum, auto
+#
+#class Op(Enum):
+#    PLUS = auto()
+#    MINUS = auto()
+#    TIMES = auto()
+#    DIV = auto()
+#
+#Expr = namedtuple('Expr', ['Op','e1','e2'])
+#
+#openp = Parser.char('(') + whitespace.optional()
+#closep = whitespace.optional() + Parser.char(')')
+#plus = whitespace.optional() + Parser.char('+') + whitespace.optional()
+#minus = whitespace.optional() + Parser.char('-') + whitespace.optional()
+#times = whitespace.optional() + Parser.char('*') + whitespace.optional()
+#div = whitespace.optional() + Parser.char('/') + whitespace.optional()
+#
+#Plus = lambda x: Expr(Op.PLUS, x[0], x[1])
+#Minus = lambda x: Expr(Op.MINUS, x[0], x[1])
+#Times = lambda x: Expr(Op.TIMES, x[0], x[1])
+#Div = lambda x: Expr(Op.DIV, x[0], x[1])
+#
+#def expr(text):
+#    recursive_plus = ((openp >= Parser(expr)) & (plus >= Parser(expr))) <= closep
+#    recursive_minus = ((openp >= Parser(expr)) & (minus >= Parser(expr))) <= closep
+#    recursive_times = ((openp >= Parser(expr)) & (times >= Parser(expr))) <= closep
+#    recursive_div = ((openp >= Parser(expr)) & (div >= Parser(expr))) <= closep
+#
+#    full = (
+#                (recursive_plus > Plus)
+#                | (recursive_minus > Minus)
+#                | (recursive_times > Times)
+#                | (recursive_div > Div)
+#                | number
+#           )
+#
+#    return full(text)
+#
+#text = '((1+2) * (9 - 11))'
+#
+#print(Parser(expr).parse_total(text))
+## Ok(
+##     Expr(
+##         Op=<Op.TIMES: 3>,
+##         e1=Expr(
+##             Op=<Op.PLUS: 1>,
+##             e1=1.0,
+##             e2=2.0
+##         ),
+##         e2=Expr(
+##             Op=<Op.MINUS: 2>,
+##             e1=9.0,
+##             e2=11.0
+##         )
+##     )
+## )
+## Here is a function that matches any character
+#
+#def any_char(text):
+#    if len(text) == 0:
+#        return Result.error("The text is too short"
+#                            " to contain any character")
+#    else:
+#        return Result.ok((text[0], text[1:]))
+#
+#any_char_parser = Parser(any_char).fmap(ord)
+#
+#print(any_char_parser('hello'))
+#print(any_char_parser('hello'))
+## Result.Ok(('h','ello'))
+#
+#
 
-print(Parser.parse_total(number, '-12'))
-print(Parser.parse_total(number, '12e10'))
-print(Parser.parse_total(number, '2.12345e+100'))
-print(Parser.parse_total(number, 'hello world'))
-print(Parser.parse_total(number, '99 bottles of beer on the wall'))
-print(Parser.parse_total(number, ''))
 
-def result_float(x):
-    try:
-        return Result.ok(float(x))
-    except Exception:
-        return Result.error('Failed to cast to a float')
-
-whitespace = Parser.oneof(' \n').many1()
-many_numbers = (
-        (whitespace.optional() >= number)
-    ).many_list()
-
-text = '2.12345e+100 2.1e10 1223 13.5 100e100'
-print(Parser.parse_total(many_numbers, text))
-# Ok(([2.12345e+100, 21000000000.0, 1223.0, 13.5, 1e+102], ''))
-
-expression = Parser.noneof(',\n').many1()
-comma = Parser.char(',')
-newline = Parser.char('\n')
-line = (expression <= comma.optional()).many_list()
-csv = ((line <= newline)).many_list()
-
-text = '''1,2,3,8,5
-hello world, my, good, friends, 5
-0,1,2,3,4
-'''
-print(Parser.parse_total(csv, text))
-
-from collections import namedtuple
 from enum import Enum, auto
 
+# This is just a basic Enumeration in Python
 class Op(Enum):
     PLUS = auto()
     MINUS = auto()
     TIMES = auto()
     DIV = auto()
 
-Expr = namedtuple('Expr', ['Op','e1','e2'])
+class Expr:
+    def __init__(self, expr1, op, expr2):
+        self.expr1 = expr1
+        self.expr2 = expr2
+        
+        if op == '+':
+            self.op = Op.PLUS
+        elif op == '-':
+            self.op = Op.MINUS
+        elif op == '*':
+            self.op = Op.TIMES
+        elif op == '/':
+            self.op = Op.DIV
+        else:
+            self.op = op
+    
+    def __repr__(self):
+        return ("Expr({}, {}, {})"
+            .format(self.expr1, self.op, self.expr2))
 
-openp = Parser.char('(') + whitespace.optional()
-closep = whitespace.optional() + Parser.char(')')
-plus = whitespace.optional() + Parser.char('+') + whitespace.optional()
-minus = whitespace.optional() + Parser.char('-') + whitespace.optional()
-times = whitespace.optional() + Parser.char('*') + whitespace.optional()
-div = whitespace.optional() + Parser.char('/') + whitespace.optional()
+whitespace = Parser.oneof(' \n').many1()
 
-Plus = lambda x: Expr(Op.PLUS, x[0], x[1])
-Minus = lambda x: Expr(Op.MINUS, x[0], x[1])
-Times = lambda x: Expr(Op.TIMES, x[0], x[1])
-Div = lambda x: Expr(Op.DIV, x[0], x[1])
+# this function surrounds a parser with optional whitespace
+# it takes a parser as an argument, and returns a new parser
+def pad(parser):
+    return (whitespace.optional() >= parser) <= whitespace.optional()
+
+# we create a bunch of symbols for our parser which
+# all can be surrounded by whitespace
+openp = pad(Parser.char('('))
+closep = pad(Parser.char(')'))
+
+# this function surrounds a parser with a pair of parens
+# it takes a parser as an argument, and returns a new parser
+def surround(parser):
+    return (openp >= parser) <= closep
+
+plus = Parser.char('+')
+minus = Parser.char('-')
+times = Parser.char('*')
+div = Parser.char('/')
+operator = pad( plus | minus | times | div )
 
 def expr(text):
-    recursive_plus = ((openp >= Parser(expr)) & (plus >= Parser(expr))) <= closep
-    recursive_minus = ((openp >= Parser(expr)) & (minus >= Parser(expr))) <= closep
-    recursive_times = ((openp >= Parser(expr)) & (times >= Parser(expr))) <= closep
-    recursive_div = ((openp >= Parser(expr)) & (div >= Parser(expr))) <= closep
+    recursive = Parser(expr)
     
-    full = (
-                (recursive_plus > Plus)
-                | (recursive_minus > Minus)
-                | (recursive_times > Times)
-                | (recursive_div > Div)
-                | number
-           )
-
+    expression = surround(
+        (recursive | number)
+        & operator
+        & (recursive | number)
+    )
+    
+    # things parsed by expression will have the slightly ugly form
+    # of Ok(((a,b),c)). To transform that into an Ok(Expr)
+    # we will define the following function:
+    weird_func = lambda weird_tuple: Expr(
+                        weird_tuple[0][0],
+                        weird_tuple[0][1],
+                        weird_tuple[1]
+                    )
+    
+    full = expression > weird_func
+    
     return full(text)
 
 text = '((1+2) * (9 - 11))'
+#
 
-print(Parser(expr).parse_total(text))
-# Ok(
-#     Expr(
-#         Op=<Op.TIMES: 3>,
-#         e1=Expr(
-#             Op=<Op.PLUS: 1>,
-#             e1=1.0,
-#             e2=2.0
-#         ),
-#         e2=Expr(
-#             Op=<Op.MINUS: 2>,
-#             e1=9.0,
-#             e2=11.0
-#         )
-#     )
-# )
+#print(Parser(expr).parse_total(text))
+
+loop = Parser.char('hi').optional().optional()
+
+#print(loop("hi"))
+
+def bad_recursion(text):
+    
+    bad = Parser(bad_recursion)
+    final = bad + Parser.char('a')
+    
+    return final(text)
+
+bad_parser = Parser(bad_recursion)
+
+print(bad_parser('a'))
