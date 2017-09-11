@@ -595,11 +595,13 @@ The Parsing Combinator is going to seem a little pointless until we get to the e
 
 First of all, while basic regular expressions can only handle regular languages, Parsing Combinators can match context sensitive languages. However, this is rarely important in practice, because most "regular expressions" in modern languages are likewise extended to be able to parse more complex languages.
 
-Secondly, Parsing Combinators are more readable than regular expressions. Although regular expressions excel at concise and quick patterns, they can quickly become hard to read, like the following regular expression for floating point numbers: `[-+]? [0-9]* \.? [0-9]+ ([eE] [-+]? [0-9]+)?`. While this is concise and accurate, it nevertheless is hard to read, and impossible to understand if you don't already know regular expressions. And the example above is fairly simple.
+Secondly, Parsing Combinators are more readable than regular expressions. Although regular expressions excel at concise and quick patterns, they can quickly become hard to read, like the following regular expression for floating point numbers: `[-+]? [0-9]* \.? [0-9]+ ([eE] [-+]? [0-9]+)?`. While this is concise and accurate, it is nevertheless hard to read, and impossible to understand if you don't already know regular expressions. And the example above is fairly simple.
 
 Thirdly, Parsing Combinators allow for more than simple matching and finding substrings. Parsing Combinators allow you to transform the result of a match without leaving the Parsing Combinator; for instance, we could write a Parsing Combinator that found IP addresses in a text file, and then resolved the IP addresses into domain names, and then returned a list of the domain names, instead of simply returning the strings that matched.
 
 Fourthly, Parsing Combinators can take advantage of compile time type checking in typed languages. While this isn't possible in Python, it is in many other languages. For example, the regular expression `[` is invalid; but most statically typed languages can't determine that it is invalid until runtime. Parsing Combinators, on the other hand, don't throw runtime exceptions like that; the information they encode is within the language itself, and therefore, they are checked at compile time to be valid.
+
+Fifthly, they can be really fast. It's rare that a high level, very abstract language can claim to be as fast as low level languages, but there are cases when parsers written with the Parser Combinator Monad can rival or even beat the speed of parsers written in custom C. Obviously, the one I wrote for this next section is optimized for readability and not speed, but the interface is basically the same.
 
 ## The Code
 
@@ -616,7 +618,7 @@ class Parser:
         return self._function(text)
 ```
 
-The basic idea behind our Parsing Combinator is that it represents a function that takes an input text in, and outputs a Result Monad holding either an error, or a tuple containing the 'matched value' and the 'remaining text'.  For example, an example function that behaves like this would be:
+The basic idea behind our Parsing Combinator is that it represents a function that takes an input text in, and outputs a Result Monad holding either an error, or a tuple containing the 'matched value' and the 'remaining text'.  For example, a function that behaves like this would be:
 
 ```python
 def parse_hi(text):
@@ -649,7 +651,7 @@ print_hi() # prints 'hi'
 print_hi('other text') # prints 'other text'
 ```
 
-One of the ways we are going to interact with the Parsing Combinator is by combining a bunch of simple Parsers into one, large parser. As an example of a simple parser, let's look at one of the example constructors for our parser.
+One of the ways we are going to interact with the Parsing Combinator is by combining a bunch of simple Parsers into one, large parser. As an example of a simple parser, let's look at one of the constructors for our parser.
 
 ```python
 # char is a single character
@@ -675,11 +677,12 @@ The above function takes a character and a text, checks whether the character is
 
 ```python
     @classmethod
-    def char(cls, char_val):
-        return Parser(lambda text: match_char(char_val, text))
+    def char(cls, char):
+        # char represents the character that our parser is going to match
+        return Parser(lambda text: match_char(char, text))
 ```
 
-The function we pass into the `Parser` constructor takes a single input, `text`, which will then be passed into `match_char` to be matched against the character we passed into the constructor `char`.
+The function we pass into the `Parser` constructor takes a single input, `text`, which will then be passed into `match_char` to be matched against the character we passed into the constructor (`char`).
 
 We'll encounter other basic constructors later; for now, this will be enough to do a few basic examples.
 
@@ -690,11 +693,12 @@ To impress upon you how weird this is, and why you would never do it in actual c
 However, it's very hard to read for the first time if all the binds look the same.
 
 ```python
-    # function takes some value, and
-    # returns a Result monad holding another value
+    # function takes a value, and returns a Result monad holding either the
+    # result of that function, or an error message.
     def bindp(self, function):
         
-        # returned holds a tuple with one
+        # returned holds a tuple holding
+        # (currently matched value, remainder of source text)
         def inner_function(returned):
             match = returned[0]
             remainder = returned[1]
@@ -709,10 +713,11 @@ However, it's very hard to read for the first time if all the binds look the sam
 Let's break it down step by step. First, the `inner_function`:
 
  * `inner_function` takes a tuple containing the matched value and the remainder of the text. It's going to mostly ignore the remainder of the text.
- * Then, it applies the function passed to `bindp` to the matched value, transforming it into some other value. However, because it might fail, it returns a Result Monad.
- * We want to return a Result Monad holding a tuple; so we're going to bind a function to the Result returned from `function` that sticks the value in that Monad inside of a tuple that also has the remaining text.
+ * Then, it applies the function (passed to `bindp`) to the matched value, transforming it into some other value. However, because it might fail, it returns a Result Monad holding that other value.
+ * We want to return a Result Monad holding a tuple containing that other value and the remainder of the text, but the other value is in a Monad, so we need to either (a) manually pull it out, or (b) use bind.
+ * We can use bind with `lambda x: Result.ok((x, remainder))` to pull the value x out of the Result Monad, and stick it back into a new Result Monad as the first member of the tuple we want.
  
-If we think of this in the context of "Monads values with context", then the matched value is the value, and the remaining text is the context. `bindp` takes a function, and lets that function operate on the value of the monad without changing the context.
+If we think of this in the context of "Monads are values with context", then the matched value is the value, and the remaining text is the context. `bindp` takes a function, and lets that function operate on the value of the Monad without changing the context.
 
 If we recall, `fmap` is very similar to `bind`, with the exception that the function passed to `fmap` is one we know isn't going to fail, and therefore doesn't return a Result Monad, just a simple value. Therefore, it requires slightly different handling. Luckily, since we know it won't fail, we can make it into a function that does return a Result Monad by simply wrapping it's return value in an `Result.Ok` monad.
 
@@ -791,7 +796,7 @@ Now that we've seen a way to construct this Monad, and how its `bind` and `fmap`
 
 `combine` is the most useful function for us; it takes two parsers (`self` and `other`) and a function. It creates a new parser that first executes `self` on the input text, and then it executes `other` on the remaining text after `self`'s match. Then it uses `function` to combine the two matches, and returns that combination along with the remaining text from `other`'s match.
 
-Once we have `combine` defined, we're going to create a bunch of other similar functions by calling `combine` with a default
+Once we have `combine` defined, we're going to create a bunch of other similar functions by calling `combine` with a default function to combine the two values.
 
 ```python
     def concat(self, other):
@@ -846,7 +851,7 @@ Here is a full table of which functions I have bound to which symbols:
 --------:|-----------|--------------
 `+`      | `concat`  | concatenates the parsed values
 `<=`     | `first`   | returns the parsed value of the first parser
-`=>`     | `last`    | returns the parsed value of the last parser
+`>=`     | `last`    | returns the parsed value of the last parser
 `&`      | `tuple`   | returns the parsed value of both parsers in a tuple
 `>>`     | `bind`    | applies the function (which might fail) to the parsed value
 `>`      | `fmap`    | applies the function to the parsed value
@@ -862,7 +867,7 @@ There are also a few more alternate constructors available, so here's a list of 
 `empty`       | Matches nothing
 `noneof`      | Matches any character not passed in as a string or list
 
-In order to use a parser, all we have to do is call it on some input. However, this will return a Result holding the matched value, remainder of text pair. I've also written a Parser method that will help streamline some parsing cases.
+In order to use a parser, all we have to do is call it on some input. However, this will return a Result holding the matched value, remainder of text pair. I've also written a Parser method that will help streamline some parsing cases. Our normal parsing combinator doesn't care if it has reached the end of the input; if you have a parser that parses numbers, and you ask it to parse `'99 bottles of beer on the wall'`, it will happily parse the `99` and ignore the rest of the string; usually, we want the entire match, not just the first part. This function causes the result to be an error if the entire string isn't matched.
 
 ```python
     def parse_total(self, string):
@@ -885,7 +890,7 @@ If you want to look at more of the code for context, it is included in the appen
 
 Now we have a powerful enough Parser Monad to recreate all of the flexibility and power of regular expressions. We can combine parsers to make more complex ones, and we can transform the values within parsers, so let's try parsing something simple; let's try and write a Parser Combinator that parses numbers.
 
-A number can be as simple as `12` or as complex as `12.00123e45`, so we're going to need to build up a complex parser. Let's start with creating a parser that parses 1 or more of consecutive digits.
+A number can be as simple as `12` or as complex as `12.00123e45`, so we're going to need to build up a complex parser. Let's start with creating a parser that parses 1 or more consecutive digits.
 
 ```python
 digits = Parser.oneof('0123456789').many1()
@@ -954,7 +959,7 @@ Everything we've done so far can basically be done in the exact same way by regu
 
 ### List of Numbers Parser
 
-Before, we matched a string using our parser, producing a Result Monad, which we then called `bind` on to transform the value the Parser returned. However, the Parser is also a Monad, so we can move the `bind` call into the parser itself, and it won't change the way it works.
+Before, we matched a string using our parser, producing a Result Monad. We then used `bind` to transform the value the Parser returned into an actual number. However, the Parser is also a Monad, so we can move the `bind` call into the parser itself, and it won't change the way it works.
 
 ```python
 number = (sign + digits + decimal + exponent) >> result_float
@@ -983,7 +988,7 @@ print(Parser.parse_total(many_numbers, text))
 
 ### CSV Parser
 
-Parsing Combinators can be used to write powerful, modular, readable, and concise parsers for any format of text. For example, here is a CSV parser in 5 lines of code.
+Parsing Combinators can be used to write powerful, modular, readable, and concise parsers for any format of text. One common way of representing values in text is the CSV file format; this format is used to represent tables in pure text. The columns are separated by commas, and the rows are separated by newlines. Below is a CSV parser in 5 lines of code.
 
 ```python
 expression = Parser.noneof(',\n').many1()
@@ -1114,7 +1119,7 @@ print(Parser(expr).parse_total(text))
 # )
 ```
 
-I decided to reproduce this sort of code using standard regular expressions; Not only did that version have twice as many lines, it was a much more fragile program. I didn't thoroughly test it, but I didn't even bother adding error checking if stuff went wrong; I just assumed everything would go right. Furthermore, there were nested loops, plenty of functions, and all in all complex, messy, hard to read code. The Parsing Combinator above, however, is short and will always return an Error Result with a sensible error message if an error happens.
+I decided to reproduce this sort of code using standard regular expressions; Not only did my regex version have twice as many lines, it was a much more fragile program. I didn't thoroughly test it, but I didn't even bother adding error checking if stuff went wrong; I just assumed everything would go right. Furthermore, there were nested loops, plenty of functions, and all in all complex, messy, hard to read code. The Parsing Combinator above, however, is short and will always return an Error Result with a sensible error message if an error happens.
 
 # Theory of Monads
 

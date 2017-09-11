@@ -414,9 +414,10 @@ result <span class="op">=</span> <span class="bu">int</span>(temp2)</code></pre>
 <h2 id="why"><span class="header-section-number">3.1</span> Why?</h2>
 <p>The Parsing Combinator is going to seem a little pointless until we get to the examples, so I'd like to try and motivate it a bit. Parsing Combinators are, on the surface, similar to regular expressions, but they are more powerful in a few important ways.</p>
 <p>First of all, while basic regular expressions can only handle regular languages, Parsing Combinators can match context sensitive languages. However, this is rarely important in practice, because most &quot;regular expressions&quot; in modern languages are likewise extended to be able to parse more complex languages.</p>
-<p>Secondly, Parsing Combinators are more readable than regular expressions. Although regular expressions excel at concise and quick patterns, they can quickly become hard to read, like the following regular expression for floating point numbers: <code>[-+]? [0-9]* \.? [0-9]+ ([eE] [-+]? [0-9]+)?</code>. While this is concise and accurate, it nevertheless is hard to read, and impossible to understand if you don't already know regular expressions. And the example above is fairly simple.</p>
+<p>Secondly, Parsing Combinators are more readable than regular expressions. Although regular expressions excel at concise and quick patterns, they can quickly become hard to read, like the following regular expression for floating point numbers: <code>[-+]? [0-9]* \.? [0-9]+ ([eE] [-+]? [0-9]+)?</code>. While this is concise and accurate, it is nevertheless hard to read, and impossible to understand if you don't already know regular expressions. And the example above is fairly simple.</p>
 <p>Thirdly, Parsing Combinators allow for more than simple matching and finding substrings. Parsing Combinators allow you to transform the result of a match without leaving the Parsing Combinator; for instance, we could write a Parsing Combinator that found IP addresses in a text file, and then resolved the IP addresses into domain names, and then returned a list of the domain names, instead of simply returning the strings that matched.</p>
 <p>Fourthly, Parsing Combinators can take advantage of compile time type checking in typed languages. While this isn't possible in Python, it is in many other languages. For example, the regular expression <code>[</code> is invalid; but most statically typed languages can't determine that it is invalid until runtime. Parsing Combinators, on the other hand, don't throw runtime exceptions like that; the information they encode is within the language itself, and therefore, they are checked at compile time to be valid.</p>
+<p>Fifthly, they can be really fast. It's rare that a high level, very abstract language can claim to be as fast as low level languages, but there are cases when parsers written with the Parser Combinator Monad can rival or even beat the speed of parsers written in custom C. Obviously, the one I wrote for this next section is optimized for readability and not speed, but the interface is basically the same.</p>
 <h2 id="the-code"><span class="header-section-number">3.2</span> The Code</h2>
 <p>Unlike the Option Monad, I'm not going to go over the entire codebase for the Parsing Combinator. I hope to provide enough context so that the inner workings aren't mysterious, but there is a lot of code (all in the appendix) and it is frankly quite dull at times.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">class</span> Parser:
@@ -427,7 +428,7 @@ result <span class="op">=</span> <span class="bu">int</span>(temp2)</code></pre>
         
     <span class="kw">def</span> <span class="fu">__call__</span>(<span class="va">self</span>, text):
         <span class="cf">return</span> <span class="va">self</span>._function(text)</code></pre></div>
-<p>The basic idea behind our Parsing Combinator is that it represents a function that takes an input text in, and outputs a Result Monad holding either an error, or a tuple containing the 'matched value' and the 'remaining text'. For example, an example function that behaves like this would be:</p>
+<p>The basic idea behind our Parsing Combinator is that it represents a function that takes an input text in, and outputs a Result Monad holding either an error, or a tuple containing the 'matched value' and the 'remaining text'. For example, a function that behaves like this would be:</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">def</span> parse_hi(text):
     <span class="cf">try</span>:
         <span class="cf">if</span> text[<span class="dv">0</span>] <span class="op">==</span> <span class="st">&#39;h&#39;</span> <span class="op">and</span> text[<span class="dv">1</span>] <span class="op">==</span> <span class="st">&#39;i&#39;</span>:
@@ -452,7 +453,7 @@ result <span class="op">=</span> <span class="bu">int</span>(temp2)</code></pre>
 print_hi <span class="op">=</span> DefaultPrinter(<span class="st">&#39;hi&#39;</span>)
 print_hi() <span class="co"># prints &#39;hi&#39;</span>
 print_hi(<span class="st">&#39;other text&#39;</span>) <span class="co"># prints &#39;other text&#39;</span></code></pre></div>
-<p>One of the ways we are going to interact with the Parsing Combinator is by combining a bunch of simple Parsers into one, large parser. As an example of a simple parser, let's look at one of the example constructors for our parser.</p>
+<p>One of the ways we are going to interact with the Parsing Combinator is by combining a bunch of simple Parsers into one, large parser. As an example of a simple parser, let's look at one of the constructors for our parser.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="co"># char is a single character</span>
 <span class="co"># text is a string</span>
 <span class="kw">def</span> match_char(char, text):
@@ -472,18 +473,20 @@ print_hi(<span class="st">&#39;other text&#39;</span>) <span class="co"># prints
             .<span class="bu">format</span>(<span class="bu">repr</span>(char), <span class="bu">repr</span>(text)))</code></pre></div>
 <p>The above function takes a character and a text, checks whether the character is the first element of the text, and if it is, returns the matched character and the rest of the string as a tuple in a Result, and if not, it returns a error message in a Result. We can use this function to define an alternate constructor for the parser now:</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="at">@classmethod</span>
-    <span class="kw">def</span> char(cls, char_val):
-        <span class="cf">return</span> Parser(<span class="kw">lambda</span> text: match_char(char_val, text))</code></pre></div>
-<p>The function we pass into the <code>Parser</code> constructor takes a single input, <code>text</code>, which will then be passed into <code>match_char</code> to be matched against the character we passed into the constructor <code>char</code>.</p>
+    <span class="kw">def</span> char(cls, char):
+        <span class="co"># char represents the character that our parser is going to match</span>
+        <span class="cf">return</span> Parser(<span class="kw">lambda</span> text: match_char(char, text))</code></pre></div>
+<p>The function we pass into the <code>Parser</code> constructor takes a single input, <code>text</code>, which will then be passed into <code>match_char</code> to be matched against the character we passed into the constructor (<code>char</code>).</p>
 <p>We'll encounter other basic constructors later; for now, this will be enough to do a few basic examples.</p>
 <p>In the next section, I am going to do something that isn't going to reflect how you would actually use monads. I'm going to use <code>bindp</code> for the <code>bind</code> function of a Parser Monad, and <code>bindr</code> for the <code>bind</code> function of a Result Monad.</p>
 <p>To impress upon you how weird this is, and why you would never do it in actual code, is that <code>bind</code> represents a common interface all monads have; it would be like naming the addition and multiplication operators something different for <code>unsigned int</code>s, <code>signed int</code>s, <code>long</code>s, and <code>float</code>s.</p>
 <p>However, it's very hard to read for the first time if all the binds look the same.</p>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="co"># function takes some value, and</span>
-    <span class="co"># returns a Result monad holding another value</span>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="co"># function takes a value, and returns a Result monad holding either the</span>
+    <span class="co"># result of that function, or an error message.</span>
     <span class="kw">def</span> bindp(<span class="va">self</span>, function):
         
-        <span class="co"># returned holds a tuple with one</span>
+        <span class="co"># returned holds a tuple holding</span>
+        <span class="co"># (currently matched value, remainder of source text)</span>
         <span class="kw">def</span> inner_function(returned):
             match <span class="op">=</span> returned[<span class="dv">0</span>]
             remainder <span class="op">=</span> returned[<span class="dv">1</span>]
@@ -495,10 +498,11 @@ print_hi(<span class="st">&#39;other text&#39;</span>) <span class="co"># prints
 <p>Let's break it down step by step. First, the <code>inner_function</code>:</p>
 <ul>
 <li><code>inner_function</code> takes a tuple containing the matched value and the remainder of the text. It's going to mostly ignore the remainder of the text.</li>
-<li>Then, it applies the function passed to <code>bindp</code> to the matched value, transforming it into some other value. However, because it might fail, it returns a Result Monad.</li>
-<li>We want to return a Result Monad holding a tuple; so we're going to bind a function to the Result returned from <code>function</code> that sticks the value in that Monad inside of a tuple that also has the remaining text.</li>
+<li>Then, it applies the function (passed to <code>bindp</code>) to the matched value, transforming it into some other value. However, because it might fail, it returns a Result Monad holding that other value.</li>
+<li>We want to return a Result Monad holding a tuple containing that other value and the remainder of the text, but the other value is in a Monad, so we need to either (a) manually pull it out, or (b) use bind.</li>
+<li>We can use bind with <code>lambda x: Result.ok((x, remainder))</code> to pull the value x out of the Result Monad, and stick it back into a new Result Monad as the first member of the tuple we want.</li>
 </ul>
-<p>If we think of this in the context of &quot;Monads values with context&quot;, then the matched value is the value, and the remaining text is the context. <code>bindp</code> takes a function, and lets that function operate on the value of the monad without changing the context.</p>
+<p>If we think of this in the context of &quot;Monads are values with context&quot;, then the matched value is the value, and the remaining text is the context. <code>bindp</code> takes a function, and lets that function operate on the value of the Monad without changing the context.</p>
 <p>If we recall, <code>fmap</code> is very similar to <code>bind</code>, with the exception that the function passed to <code>fmap</code> is one we know isn't going to fail, and therefore doesn't return a Result Monad, just a simple value. Therefore, it requires slightly different handling. Luckily, since we know it won't fail, we can make it into a function that does return a Result Monad by simply wrapping it's return value in an <code>Result.Ok</code> monad.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="kw">def</span> fmap(<span class="va">self</span>, function):
         <span class="cf">return</span> <span class="va">self</span>.bindp(<span class="kw">lambda</span> x: Result.ok(function(x)))</code></pre></div>
@@ -558,7 +562,7 @@ any_char_parser <span class="op">=</span> Parser(any_char)
               )
             )</code></pre></div>
 <p><code>combine</code> is the most useful function for us; it takes two parsers (<code>self</code> and <code>other</code>) and a function. It creates a new parser that first executes <code>self</code> on the input text, and then it executes <code>other</code> on the remaining text after <code>self</code>'s match. Then it uses <code>function</code> to combine the two matches, and returns that combination along with the remaining text from <code>other</code>'s match.</p>
-<p>Once we have <code>combine</code> defined, we're going to create a bunch of other similar functions by calling <code>combine</code> with a default</p>
+<p>Once we have <code>combine</code> defined, we're going to create a bunch of other similar functions by calling <code>combine</code> with a default function to combine the two values.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="kw">def</span> concat(<span class="va">self</span>, other):
         <span class="co"># think string concatenation for this plus, not</span>
         <span class="co"># addition of numbers.</span>
@@ -614,7 +618,7 @@ match_a.<span class="bu">tuple</span>(match_b)</code></pre></div>
 <td>returns the parsed value of the first parser</td>
 </tr>
 <tr class="odd">
-<td align="right"><code>=&gt;</code></td>
+<td align="right"><code>&gt;=</code></td>
 <td><code>last</code></td>
 <td>returns the parsed value of the last parser</td>
 </tr>
@@ -667,7 +671,7 @@ match_a.<span class="bu">tuple</span>(match_b)</code></pre></div>
 </tr>
 </tbody>
 </table>
-<p>In order to use a parser, all we have to do is call it on some input. However, this will return a Result holding the matched value, remainder of text pair. I've also written a Parser method that will help streamline some parsing cases.</p>
+<p>In order to use a parser, all we have to do is call it on some input. However, this will return a Result holding the matched value, remainder of text pair. I've also written a Parser method that will help streamline some parsing cases. Our normal parsing combinator doesn't care if it has reached the end of the input; if you have a parser that parses numbers, and you ask it to parse <code>'99 bottles of beer on the wall'</code>, it will happily parse the <code>99</code> and ignore the rest of the string; usually, we want the entire match, not just the first part. This function causes the result to be an error if the entire string isn't matched.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="kw">def</span> parse_total(<span class="va">self</span>, string):
         
         <span class="kw">def</span> check_full(tup):
@@ -683,7 +687,7 @@ match_a.<span class="bu">tuple</span>(match_b)</code></pre></div>
 <p>If you want to look at more of the code for context, it is included in the appendices of this paper.</p>
 <h2 id="using-the-parser-combinator"><span class="header-section-number">3.3</span> Using the Parser Combinator</h2>
 <p>Now we have a powerful enough Parser Monad to recreate all of the flexibility and power of regular expressions. We can combine parsers to make more complex ones, and we can transform the values within parsers, so let's try parsing something simple; let's try and write a Parser Combinator that parses numbers.</p>
-<p>A number can be as simple as <code>12</code> or as complex as <code>12.00123e45</code>, so we're going to need to build up a complex parser. Let's start with creating a parser that parses 1 or more of consecutive digits.</p>
+<p>A number can be as simple as <code>12</code> or as complex as <code>12.00123e45</code>, so we're going to need to build up a complex parser. Let's start with creating a parser that parses 1 or more consecutive digits.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">digits <span class="op">=</span> Parser.oneof(<span class="st">&#39;0123456789&#39;</span>).many1()</code></pre></div>
 <p>Now, we need to express an optional decimal place, followed by one of more digits. Remember, the <code>+</code> operator will use the first parser, and then the second parser, and concatenate their results.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">decimal <span class="op">=</span> (Parser.char(<span class="st">&#39;.&#39;</span>) <span class="op">+</span> digits).optional()</code></pre></div>
@@ -725,7 +729,7 @@ Parser.parse_total(number, <span class="st">&#39;7.22345e10&#39;</span>) <span c
 <h2 id="going-further"><span class="header-section-number">3.4</span> Going Further</h2>
 <p>Everything we've done so far can basically be done in the exact same way by regular expressions. However, because of the way we've defined the Parsing Combinator, we can use <code>bind</code> and <code>fmap</code> inside of Parsing Combinator expressions. This allows us to parse complex expressions into fully formed and entirely arbitrary python objects.</p>
 <h3 id="list-of-numbers-parser"><span class="header-section-number">3.4.1</span> List of Numbers Parser</h3>
-<p>Before, we matched a string using our parser, producing a Result Monad, which we then called <code>bind</code> on to transform the value the Parser returned. However, the Parser is also a Monad, so we can move the <code>bind</code> call into the parser itself, and it won't change the way it works.</p>
+<p>Before, we matched a string using our parser, producing a Result Monad. We then used <code>bind</code> to transform the value the Parser returned into an actual number. However, the Parser is also a Monad, so we can move the <code>bind</code> call into the parser itself, and it won't change the way it works.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">number <span class="op">=</span> (sign <span class="op">+</span> digits <span class="op">+</span> decimal <span class="op">+</span> exponent) <span class="op">&gt;&gt;</span> result_float
 
 <span class="co"># whitespace consists of a space, a tab, or a newline</span>
@@ -745,7 +749,7 @@ many_numbers <span class="op">=</span> (
 <span class="bu">print</span>(Parser.parse_total(many_numbers, text))
 <span class="co"># Ok([2.12345e+100, 21000000000.0, 1223.0, 13.5, 1e+102])</span></code></pre></div>
 <h3 id="csv-parser"><span class="header-section-number">3.4.2</span> CSV Parser</h3>
-<p>Parsing Combinators can be used to write powerful, modular, readable, and concise parsers for any format of text. For example, here is a CSV parser in 5 lines of code.</p>
+<p>Parsing Combinators can be used to write powerful, modular, readable, and concise parsers for any format of text. One common way of representing values in text is the CSV file format; this format is used to represent tables in pure text. The columns are separated by commas, and the rows are separated by newlines. Below is a CSV parser in 5 lines of code.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">expression <span class="op">=</span> Parser.noneof(<span class="st">&#39;,</span><span class="ch">\n</span><span class="st">&#39;</span>).many1()
 comma <span class="op">=</span> Parser.char(<span class="st">&#39;,&#39;</span>)
 newline <span class="op">=</span> Parser.char(<span class="st">&#39;</span><span class="ch">\n</span><span class="st">&#39;</span>)
@@ -862,7 +866,7 @@ text <span class="op">=</span> <span class="st">&#39;((1+2) * (9 - 11))&#39;</sp
 <span class="co">#         )</span>
 <span class="co">#     )</span>
 <span class="co"># )</span></code></pre></div>
-<p>I decided to reproduce this sort of code using standard regular expressions; Not only did that version have twice as many lines, it was a much more fragile program. I didn't thoroughly test it, but I didn't even bother adding error checking if stuff went wrong; I just assumed everything would go right. Furthermore, there were nested loops, plenty of functions, and all in all complex, messy, hard to read code. The Parsing Combinator above, however, is short and will always return an Error Result with a sensible error message if an error happens.</p>
+<p>I decided to reproduce this sort of code using standard regular expressions; Not only did my regex version have twice as many lines, it was a much more fragile program. I didn't thoroughly test it, but I didn't even bother adding error checking if stuff went wrong; I just assumed everything would go right. Furthermore, there were nested loops, plenty of functions, and all in all complex, messy, hard to read code. The Parsing Combinator above, however, is short and will always return an Error Result with a sensible error message if an error happens.</p>
 <h1 id="theory-of-monads"><span class="header-section-number">4</span> Theory of Monads</h1>
 <p>Now that we've seen a few examples of what a Monad is, we can talk about the formal definition. This is going to be the most abstract section of the text, but I'll try and keep any statements from category theory or abstract algebra from appearing here.</p>
 <h2 id="defining-monads"><span class="header-section-number">4.1</span> Defining Monads</h2>
