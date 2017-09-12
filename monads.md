@@ -23,7 +23,7 @@ In contrast, several other explanations range from useless to wrong.
  - Monads are monoids in the category of endofunctors
  - Monads are the the totality of all beings
  
-The first definition is correct, and if you already know what a monoid, a category, and an endofunctor is, congratulations! You probably are at least working on your PhD, and you can use that definition to help inform the rest of this essay. If you have no idea what those words mean, don't worry about trying to interpret them. They're mathy words to describe what we're going to talk about later in more plain terms.
+The first definition is correct, and if you already know what a monoid, a category, and an endofunctor is, congratulations! You probably are working on, or have, your PhD, and you can use that definition to help inform the rest of this essay. If you have no idea what those words mean, don't worry about trying to interpret them. They're mathy words to describe what we're going to talk about later in more plain terms.
 
 The second definition is wrong. It refers to a completely different concept in philosophy and theology that happens to have the same name. Ignore it.
 
@@ -33,7 +33,7 @@ Finally, we have definitions that are absurd:
  
 I have seen people make fun of this definition a lot, but I've never seen it actually used. However, I doubt that it will be useful to anyone who doesn't know what Monads are.
 
-Finally, I want to remark upon how varied and different Monads truly are; This essay intends to introduce a few common monads, and provide a framework for thinking about them, but you will still come across Monads which are foreign to you. By an analogy; consider this paper an introduction to music, where I talk about classical music, jazz, and rock and roll. That barely covers many genres of music; a reader of that paper would be confounded upon hearing rap for the first time. I don't intend for this paper to be comprehensive, merely introductory.
+Finally, I want to remark upon how varied and different Monads truly are; This essay intends to introduce a few common monads, and provide a framework for thinking about them, but you will still come across Monads which are foreign to you. By an analogy; consider this paper an introduction to music, where I talk about classical music, jazz, and rock and roll. That barely covers many genres of music; a reader of that paper would be confounded upon hearing rap for the first time.
 
 # Our First Monads
 
@@ -98,7 +98,7 @@ def divide_elements(ls, i1, i2):
     return ls[i1]/ls[i2]
 ```
 
-Now, we have combined the two operations in python which might lead to an exception, and wehave done it in a way that allows for three different operations to result in an exception. We can rewrite this function so that it will not throw any errors by checking after each step for an error code.
+Now, we have combined the two operations in python which might lead to an exception, and we have done it in a way that allows for three different operations to result in an exception. We can rewrite this function so that it will not throw any errors by checking after each step for an error code.
 
 ```python
 def index(ls, i):
@@ -262,6 +262,75 @@ And that's because we haven't yet implemented the most important function for a 
 
 ## The Bind and Fmap Functions
 
+Currently, to operate on a value inside of an Option Monad, we need to manually unwrap it first. Instead of having to do this every time, we can instead define a new method on our Option Monad to do this for us.
+
+```python
+    # function operates on the value inside of our Option Monad
+    def fmap(self, function):
+        if self.is_none():
+            # self is an Option Monad
+            return self
+
+        val = self.unwrap()
+        newval = function(val)
+        # We create a new Monad here to surround the new value
+        return Option.some(newval)
+    # fmap returns an Option Monad.
+```
+
+The fmap function is a higher order function. That means it is a function that takes another function as an argument, and does something with that function. If you look in the end of the previous section, we repeated this piece of code two times:
+
+```python
+    res = index(ls, i1)
+    if res.is_none():
+        return Option.none()
+```
+
+We were checking whether a function had successfully computed a value or whether an error had occurred. If the value existed, we later passed that value into a function. If the value did not exist, then we simply returned the indication of failure, an `Option.none()` object.
+
+Looking at bind, we can see it performs a similar operation. `res.fmap(function)` checks whether or not `res` is a successfully computed value, in which case it passes that value into `function`, or if it is a failed computation, in which case it simply returns itself, passing the failed computation forward.
+
+But then it wraps the return value of the function into an Option Monad. Why? Well, for starters, it's just consistent. We want to be able to predict that `fmap` will return an Option Monad, as opposed to having to check the type every time it is returned. Secondly, it enables us to chain the `fmap` operation multiple times.
+
+```python
+Option.some(-62).fmap(abs).fmap(chr)
+# Some('<')
+```
+
+The above code is an example of chaining `fmap`; we start with some option value, `Some(-62)`, and we `fmap` the `abs` function, which computes the absolute values, and the `chr` function, which turns a number into its corresponding character. In this case, `62` corresponds to `'<'`.
+
+At a higher level, `fmap` unwraps the value in our Monad, and passes that value through a function. However, `fmap` does not do so blindly. It takes care to maintain all of the Monad's internal context for the value. In this case, that context is simple; all `fmap` has to do is return early with Nothing if the Monad `fmap` is called on is Nothing, and wrap the result of the function back into an Option Monad otherwise.
+
+However, we can't quite use this function to fix the problem we had earlier. Let's see what happens if we try to use `fmap` in that case:
+
+# AAAH IZAAK USES ROOT BELOW BUT DIVISION ABOVE
+
+```python
+import math
+
+def root(x):
+    if x < 0:
+        return Option.none()
+    return Option.some(math.sqrt(x))
+
+def index(ls, i):
+    if i < 0 or i >= len(ls):
+        return Option.none()
+    return Option.some(ls[i])
+
+def root_element(ls, i):
+    return index(ls, i).fmap(root)
+```
+
+This looks a lot nicer, but it doesn't quite work. We no longer have to do any manual unwrapping, but if we run this, we get a weird result:
+
+```python
+root_element([1,2,3],1)
+# Some(Some(1.4142135623730951))
+```
+
+Instead of having what we want, which is `Some(1.4142135623730951)`, we have our value wrapped in an extra Monadic layer. This is because our `root` function returns a Monad, and `fmap` wraps the result of `root` in a Monad. This is an annoying problem, and we can write a function to flatten it if we want, but instead, we usually write another function; `bind`.
+
 ```python
     # function returns an Option Monad
     def bind(self, function):
@@ -275,73 +344,26 @@ And that's because we haven't yet implemented the most important function for a 
     # bind returns an Option Monad.
 ```
 
-The bind function is a higher order function. That means it is a function that takes another function as an argument, and does something with that function. If you look in the end of the previous section, we repeated this piece of code two times:
+`bind` does essentially the same thing as `fmap`, but we expect that the function we pass to `bind` to be a monadic function; it needs to return a Monad. If we do this, we can use `bind` and `fmap` to chain function application on an Option Monad, and we can rewrite our above code again.
 
 ```python
-    res = index(ls, i1)
-    if res.is_none():
+import math
+
+def root(x):
+    if x < 0:
         return Option.none()
-```
-
-We were checking whether a function had successfully computed a value or whether an error had occurred. If the value existed, we later passed that value into a function. If the value did not exist, then we simply returned the indication of failure, an `Option.none()` object.
-
-Looking at bind, we can see it performs a similar operation. `res.bind(function)` checks whether or not `res` is a successfully computed value, in which case it passes that value into `function`, or if it is a failed computation, in which case it simply returns itself, passing the failed computation forward.
-
-At a higher level, `bind` unwraps the value in our Monad, and passes that value through a function. However, `bind` does not do so blindly. It takes care to maintain all of the Monad's internal context for the value. In this case, that context is simple; all `bind` has to do is return early with Nothing if the Monad `bind` is called on is Nothing.
-
-```python
-    # function returns a non-monadic value
-    def fmap(self, function):
-        if self.is_none():
-            # self is an Option Monad
-            return self
-
-        val = self.unwrap()
-        # We create a new Monad here to surround the new value
-        return Option.some(function(val))
-    # fmap returns an Option Monad.
-```
-
-`fmap` does something similar to `bind`; whereas the function passed to `bind` might fail, and therefore return an Option Monad, a function passed to `fmap` will always succeed by definition, and therefore the return value needs to be wrapped in an Option Monad again. `fmap` and `bind` serve very similar purposes, but they are useful in different contexts.
-
-So, with `fmap` and `bind` in mind, let's consider the our code again.
-
-```python
-def division(x, y):
-    if y == 0:
-        return Option.none()
-    return Option.some(x / y)
+    return Option.some(math.sqrt(x))
 
 def index(ls, i):
     if i < 0 or i >= len(ls):
         return Option.none()
     return Option.some(ls[i])
 
-def divide_elements(ls, i1, i2):
-    res1 = index(ls, i1)
-    res2 = index(ls, i2)
-    
-    partial = lambda x: lambda y: division(x,y)
-    
-    return res2.bind(res1.bind(partial))
+def root_element(ls, i):
+    return index(ls, i).bind(root)
 ```
 
-I have changed a few things, so go back and look at what I have done. There is this new line `partial = lambda x: lambda y: division(x,y)`. This is a way of defining an inline function in python; here, I have a function of x that returns a function of y, that itself returns `division(x,y)`. This makes it so that instead of calling this function with two arguments, I instead call it with one argument twice. Here's an example of using a similar lambda function:
-
-```python
-partial = lambda x: lambda y: x/y
-
-two_over = partial(2)
-two_over(3) # same as 2 / 3
-two_over(5) # same as 2 / 5
-
-ten_over = partial(10)
-ten_over(50) # same as 10 / 50
-
-partial(3)(4) # same as 3 / 4
-```
-
-What I do on the return statement line is I use bind to apply the function to these arguments; the function `division` will fail drastically if it gets an Option Monad in as an argument; it would fail on the comparison to zero and it would also fail on trying to divide two Option Monads. By using `bind`, I am telling the Options to apply the function to themselves if they have a value, or returning Nothing if they don't have a value. This wraps the error handling into the data structure that represents errors without me having to ever write an explicit `if x.is_some():` check.
+Now, we finally have a worthy example of how to use Option Monads. We have written two functions which use Option Monads to handle errors, and when we want to write a new function that uses both of those functions, we can completely ignore checking for errors or unwrapping values; we just use `bind` and let the Option Monad handle everything.
 
 You may still think this sort of thing is useless; and in python, for such a simple example, it kinda is! But as we continue to explore Monads, we will encounter some examples that get more and more complex without Monads, but that Monads make simpler. Oh hey look, that's the next section.
 
@@ -506,6 +528,8 @@ There is one major problem with the Option monad above; if our code fails, we ha
 The Result Monad uses slightly different names; a value is Ok if it is a successful computation, and it is an Error if the computation has failed. The functions that check this status are `self.is_ok()` and `self.is_error()`. `self.is_ok()` returns `True` if there is a value, and `False` if there is an error message. `self.is_error()` does the opposite.
 
 ```python
+class Result:
+    
     def __init__(self, failed, value, message):
         self._failed = failed
         self._message = message
@@ -526,9 +550,24 @@ In order to access the error message, we add a new function like `unwrap` from t
 
 This function checks whether or not we have failed, and returns the error message if it is an Error. Just like `unwrap`, it throws an Exception if there is no error message.
 
-`bind` has not changed at all, but it is nice to note that when you return `self` in the case of the error, the error message stays the same. This means that when we chain multiple `bind` calls together, the first one that fails will have its error message propagate through till the end.
+```python
+
+```
+
+`bind` and `fmap` have not changed at all, but it is nice to note that when you return `self` in the case of the error, the error message stays the same. This means that when we chain multiple `bind` and `fmap` calls together, the first one that fails will have its error message propagate through till the end.
 
 ```python
+    # function operates on the value in the monad
+    def fmap(self, function):
+        if self.is_error():
+            # self is a Result Monad
+            return self
+        
+        val = self.unwrap()
+        # function(val) is a value, so we have to wrap it
+        return Result.ok(function(val))
+    # bind returns a Result Monad
+
     # function returns a Result Monad
     def bind(self, function):
         if self.is_error():
@@ -716,8 +755,6 @@ Let's break it down step by step. First, the `inner_function`:
  * Then, it applies the function (passed to `bindp`) to the matched value, transforming it into some other value. However, because it might fail, it returns a Result Monad holding that other value.
  * We want to return a Result Monad holding a tuple containing that other value and the remainder of the text, but the other value is in a Monad, so we need to either (a) manually pull it out, or (b) use bind.
  * We can use bind with `lambda x: Result.ok((x, remainder))` to pull the value x out of the Result Monad, and stick it back into a new Result Monad as the first member of the tuple we want.
- 
-If we think of this in the context of "Monads are values with context", then the matched value is the value, and the remaining text is the context. `bindp` takes a function, and lets that function operate on the value of the Monad without changing the context.
 
 If we recall, `fmap` is very similar to `bind`, with the exception that the function passed to `fmap` is one we know isn't going to fail, and therefore doesn't return a Result Monad, just a simple value. Therefore, it requires slightly different handling. Luckily, since we know it won't fail, we can make it into a function that does return a Result Monad by simply wrapping it's return value in an `Result.Ok` monad.
 
@@ -1162,7 +1199,7 @@ def join(monad):
     monad.bind(lambda x: x.unwrap() if x.is_some() else x)
 ```
 
-This means, for our purposes, for something to be a Monad, we require it to either have both `fmap` *and* `join`, or `bind`.
+This means, for our purposes, for something to be a Monad, we require it to either have both `fmap` *and* `join`, or just `bind`. However, it is common for Monads to have all three available.
 
 ## Monad Laws
 
@@ -1188,11 +1225,15 @@ Monad(x).fmap(f) == Monad(f(x))
 
 If you want, you can put these rules into equivalent forms using `bind` instead of `fmap`.
 
-These might seem common sense, and if they are, that's good! The only reason that we require that these rules are followed is so that somebody doesn't create a Monad that behaves weirdly and it screws up our program. If they don't seem common sense, that's okay; you don't really have to understand them.They basically boil down to "Monads should behave sensibly when you fmap or bind functions over them".
+These might seem common sense, and if they are, that's good! The only reason that we require that these rules are followed is so that somebody doesn't create a Monad that behaves weirdly and it screws up our program. They basically boil down to "Monads should behave sensibly when you fmap or bind functions over them".
 
-# The Zeroth Monad
+# More Monad Examples
 
-Our first section was titled 'Our First Monad'. However, we are computer scientists, and therefore we start counting at zero, not at one. So let's talk about another Monad that everyone reading this document has probably used, but never noticed that it was a Monad. It turns out that a list is a Monad.
+## The Zeroth Monad
+
+Our first section was titled 'Our First Monad'. However, we are computer scientists, and therefore we start counting at zero, not at one. So let's talk about another Monad that everyone reading this document has probably used, but never noticed that it was a Monad.
+
+Lists.
 
 How is a list a Monad? Well, from the previous section, a Monad is really just anything with a `bind` function, or with a `fmap` and a `join` function. And while not every programming language has these functions built in, we can easily write these functions for a list.
 
@@ -1264,12 +1305,12 @@ bind(
 
 In this case, we execute two functions in series, getting all of the valid results to our question in one list; but the number of results isn't the same for all inputs, so we need a Monad to represent this computational uncertainty.
 
-# Promises (in Javascript)
+## Promises (in Javascript)
 
 As I was writing this essay, I started working on a project in Javascript that ended up using a thing called Promises. In Javascript, it's common to call a function that will perform some action, wait for something else to respond to the action, and then respond to that response. This is traditionally done with callbacks: passing a function into another function.
 
 ```javascript
-// This function waits for 3000 ms, and then
+// setTimeout waits for 3000 ms, and then
 // calls the function you passed it.
 setTimeout(
     function(){
@@ -1287,13 +1328,13 @@ However, if the function you pass in needs to call another function that uses a 
 function handler () {
   // validateParams takes a function
   validateParams((err) => {
-    if (err) return done(err)
+    if (err) { console.log('Error:', err); return }
     // dbQuery takes a function
     dbQuery((err, dbResults) => {
-      if (err) return done(err)
+      if (err) { console.log('Error:', err); return }
       // serviceCall takes a function
       serviceCall(dbResults, (err, serviceResults) => {
-        
+        //do something here!
       })
     })
   })
@@ -1308,7 +1349,7 @@ function handler (done) {
   return validateParams()
     .then(dbQuery)
     .then(serviceCall)
-    .then(done)
+    .then( /* do something here! */ )
     .catch((err) => {
       console.log('Error:', err)
   })
