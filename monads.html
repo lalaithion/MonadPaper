@@ -51,8 +51,8 @@
 <span class="cf">else</span>:
     <span class="bu">print</span>(value)</code></pre></div>
 <h3 id="combining-the-above"><span class="header-section-number">2.1.3</span> Combining The Above</h3>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">def</span> divide_elements(ls, i1, i2):
-    <span class="cf">return</span> ls[i1]<span class="op">/</span>ls[i2]</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">def</span> inverse_element(ls, i):
+    <span class="cf">return</span> <span class="dv">1</span><span class="op">/</span>ls[i]</code></pre></div>
 <p>Now, we have combined the two operations in python which might lead to an exception, and we have done it in a way that allows for three different operations to result in an exception. We can rewrite this function so that it will not throw any errors by checking after each step for an error code.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">def</span> index(ls, i):
     <span class="cf">if</span> i <span class="op">&lt;</span> <span class="dv">0</span> <span class="op">or</span> i <span class="op">&gt;=</span> <span class="bu">len</span>(ls):
@@ -64,22 +64,18 @@
         <span class="cf">return</span> <span class="va">None</span>
     <span class="cf">return</span> x <span class="op">/</span> y
 
-<span class="kw">def</span> divide_elements(ls, i1, i2):
-    failure, v1 <span class="op">=</span> index(ls, i1)
+<span class="kw">def</span> inverse_element(ls, i):
+    failure, value <span class="op">=</span> index(ls, i)
     <span class="cf">if</span> failure:
         <span class="cf">return</span> <span class="va">None</span>
     
-    failure, v2 <span class="op">=</span> index(ls, i2)
-    <span class="cf">if</span> failure:
-        <span class="cf">return</span> <span class="va">None</span>
-    
-    <span class="cf">return</span> division(v1, v2)</code></pre></div>
+    <span class="cf">return</span> division(<span class="dv">1</span>, value)</code></pre></div>
 <p>This code works nicely; you can throw two types of errors at it, and it returns <code>None</code> when either occurs.</p>
 <h3 id="other-programming-languages"><span class="header-section-number">2.1.4</span> Other Programming Languages</h3>
 <p>Python has been very nice to us so far. In Python, it is easy to write a function that returns two values, or returns different types in different scenarios. Python also has other features, such as Exceptions, which make this rewriting we've been doing sort of useless. The most Pythonic way of writing the above would probably be to catch the exceptions:</p>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">def</span> divide_elements(ls, i1, i2):
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">def</span> inverse_element(ls, i):
     <span class="cf">try</span>:
-        <span class="cf">return</span> ls[i1]<span class="op">/</span>ls[i2]
+        <span class="cf">return</span> <span class="dv">1</span><span class="op">/</span>ls[i]
     <span class="cf">except</span> (<span class="pp">IndexError</span>, <span class="pp">ZeroDivisionError</span>):
         <span class="cf">return</span> <span class="va">None</span></code></pre></div>
 <p>Other languages have their own ways of dealing with the errors we discussed above, and they all have their own benefits. In C, the common pattern is to have the actual return value of the function be a number that indicates whether an error occurred, and if one did, what the error was. To get the meaningful result from the function, you pass a pointer to a block of memory into the function, and that function writes the answer you want into that block of memory. This is much faster and simpler than having to write all of the infrastructure required to deal with throwing exceptions and allowing someone above you to catch that exception.</p>
@@ -165,16 +161,12 @@
         <span class="cf">return</span> Option.none()
     <span class="cf">return</span> Option.some(ls[i])
 
-<span class="kw">def</span> divide_elements(ls, i1, i2):
-    res1 <span class="op">=</span> index(ls, i1)
-    <span class="cf">if</span> res1.is_none():
+<span class="kw">def</span> inverse_element(ls, i):
+    res <span class="op">=</span> index(ls, i)
+    <span class="cf">if</span> res.is_none():
         <span class="cf">return</span> Option.none()
     
-    res2 <span class="op">=</span> index(ls, i2)
-    <span class="cf">if</span> res2.is_none():
-        <span class="cf">return</span> Option.none()
-    
-    <span class="cf">return</span> division(res1.unwrap(), res2.unwrap())</code></pre></div>
+    <span class="cf">return</span> division(<span class="dv">1</span>, res1.unwrap())</code></pre></div>
 <p>The above code is the exact same length in lines; and already has some benefits. First, these functions have a return type that can be determined just be looking at the code, is more useful in statically typed languages than dynamically typed languages (like Python). Second, we do not have to remember the convention for every function. Before, we had to remember that <code>division</code> returned <code>None</code> for an error, but <code>index</code> returned <code>False, None</code> for an error. Despite these benefits, the code is still filled with checks for errors and clustered with temporary variables.</p>
 <p>And that's because we haven't yet implemented the most important function for a Monad. This is the most important but also the most complicated part of the Option Monad, so I am going to give it its own section.</p>
 <h2 id="the-bind-and-fmap-functions"><span class="header-section-number">2.3</span> The Bind and Fmap Functions</h2>
@@ -190,8 +182,8 @@
         <span class="co"># We create a new Monad here to surround the new value</span>
         <span class="cf">return</span> Option.some(newval)
     <span class="co"># fmap returns an Option Monad.</span></code></pre></div>
-<p>The fmap function is a higher order function. That means it is a function that takes another function as an argument, and does something with that function. If you look in the end of the previous section, we repeated this piece of code two times:</p>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    res <span class="op">=</span> index(ls, i1)
+<p>The fmap function is a higher order function. That means it is a function that takes another function as an argument, and does something with that function. If you look in the end of the previous section, in order to pass the result of <code>index</code> into <code>division</code>, we had to use this code as boilerplate; and if we wanted to keep passing our value through more and more functions, we would have to continue repeating this block of code.</p>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    res <span class="op">=</span> index(ls, i)
     <span class="cf">if</span> res.is_none():
         <span class="cf">return</span> Option.none()</code></pre></div>
 <p>We were checking whether a function had successfully computed a value or whether an error had occurred. If the value existed, we later passed that value into a function. If the value did not exist, then we simply returned the indication of failure, an <code>Option.none()</code> object.</p>
@@ -202,22 +194,26 @@
 <p>The above code is an example of chaining <code>fmap</code>; we start with some option value, <code>Some(-62)</code>, and we <code>fmap</code> the <code>abs</code> function, which computes the absolute values, and the <code>chr</code> function, which turns a number into its corresponding character. In this case, <code>62</code> corresponds to <code>'&lt;'</code>.</p>
 <p>At a higher level, <code>fmap</code> unwraps the value in our Monad, and passes that value through a function. However, <code>fmap</code> does not do so blindly. It takes care to maintain all of the Monad's internal context for the value. In this case, that context is simple; all <code>fmap</code> has to do is return early with Nothing if the Monad <code>fmap</code> is called on is Nothing, and wrap the result of the function back into an Option Monad otherwise.</p>
 <p>However, we can't quite use this function to fix the problem we had earlier. Let's see what happens if we try to use <code>fmap</code> in that case:</p>
-<h1 id="aaah-izaak-uses-root-below-but-division-above"><span class="header-section-number">3</span> AAAH IZAAK USES ROOT BELOW BUT DIVISION ABOVE</h1>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="im">import</span> math
-
-<span class="kw">def</span> root(x):
-    <span class="cf">if</span> x <span class="op">&lt;</span> <span class="dv">0</span>:
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">def</span> division(x, y):
+    <span class="cf">if</span> y <span class="op">==</span> <span class="dv">0</span>:
         <span class="cf">return</span> Option.none()
-    <span class="cf">return</span> Option.some(math.sqrt(x))
+    <span class="cf">return</span> Option.some(x <span class="op">/</span> y)
 
 <span class="kw">def</span> index(ls, i):
     <span class="cf">if</span> i <span class="op">&lt;</span> <span class="dv">0</span> <span class="op">or</span> i <span class="op">&gt;=</span> <span class="bu">len</span>(ls):
         <span class="cf">return</span> Option.none()
     <span class="cf">return</span> Option.some(ls[i])
 
-<span class="kw">def</span> root_element(ls, i):
-    <span class="cf">return</span> index(ls, i).fmap(root)</code></pre></div>
-<p>This looks a lot nicer, but it doesn't quite work. We no longer have to do any manual unwrapping, but if we run this, we get a weird result:</p>
+<span class="kw">def</span> inverse_element(ls, i):
+    res <span class="op">=</span> index(ls, i)
+    <span class="cf">return</span> res.fmap(<span class="kw">lambda</span> x: division(<span class="dv">1</span>,x))</code></pre></div>
+<p>Aside: In Python, you can create a simple one-line function by writing <code>lambda</code> followed by the list of arguments, then a colon, and then an expression which will be returned by the function.</p>
+<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">add <span class="op">=</span> <span class="kw">lambda</span> x, y: x <span class="op">+</span> y
+add(<span class="dv">2</span>,<span class="dv">3</span>) <span class="co">#5</span>
+
+add_three <span class="op">=</span> <span class="kw">lambda</span> x: <span class="dv">3</span> <span class="op">+</span> x
+add_three(<span class="dv">7</span>) <span class="co"># 10</span></code></pre></div>
+<p>Our above solution using <code>fmap</code> looks a lot nicer, but it doesn't quite work. We no longer have to do any manual unwrapping, but if we run this, we get a weird result:</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">root_element([<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>],<span class="dv">1</span>)
 <span class="co"># Some(Some(1.4142135623730951))</span></code></pre></div>
 <p>Instead of having what we want, which is <code>Some(1.4142135623730951)</code>, we have our value wrapped in an extra Monadic layer. This is because our <code>root</code> function returns a Monad, and <code>fmap</code> wraps the result of <code>root</code> in a Monad. This is an annoying problem, and we can write a function to flatten it if we want, but instead, we usually write another function; <code>bind</code>.</p>
@@ -248,7 +244,7 @@
     <span class="cf">return</span> index(ls, i).bind(root)</code></pre></div>
 <p>Now, we finally have a worthy example of how to use Option Monads. We have written two functions which use Option Monads to handle errors, and when we want to write a new function that uses both of those functions, we can completely ignore checking for errors or unwrapping values; we just use <code>bind</code> and let the Option Monad handle everything.</p>
 <p>You may still think this sort of thing is useless; and in python, for such a simple example, it kinda is! But as we continue to explore Monads, we will encounter some examples that get more and more complex without Monads, but that Monads make simpler. Oh hey look, that's the next section.</p>
-<h2 id="a-more-complex-example"><span class="header-section-number">3.1</span> A More Complex Example</h2>
+<h2 id="a-more-complex-example"><span class="header-section-number">2.4</span> A More Complex Example</h2>
 <p>In order to give a more illustrative example of where the Option Monad can be more useful, consider the following problem; open a file, and read the first whitespace-terminated word from the beginning of the file, and parse it into an integer if possible. This problem is fairly easy to do with built-in Python functions, but the Option Monad can make error handling easier. However, none of Python's built-in functions use the Option Monad, so we will have to rewrite them so that they do. In languages with the Option Monad as a star player, such as Rust, Haskell, or Scala, this is not an issue.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">def</span> option_open(filename, mode<span class="op">=</span><span class="st">&#39;r&#39;</span>):
     <span class="cf">try</span>:
@@ -367,7 +363,7 @@ result <span class="op">=</span> <span class="bu">int</span>(temp2)</code></pre>
       <span class="op">&gt;&gt;</span> option_int
     )</code></pre></div>
 <p>The Monad version is simpler, just as safe, and even a line shorter (two if you don't count the line with a single closing parenthesis). Not to mention cooler and more elegant by far.</p>
-<h2 id="the-result-monad"><span class="header-section-number">3.2</span> The Result Monad</h2>
+<h2 id="the-result-monad"><span class="header-section-number">2.5</span> The Result Monad</h2>
 <p>There is one major problem with the Option monad above; if our code fails, we have no way to know how or when. With the standard python example, we could print an error message to the screen or to a file that would let us know what kind of error occurred. There is another Monad, called the Result Monad, that allows us to do just that while still having the power of the Option Monad. I won't reproduce the entire code here (it is in the appendix) but I will go over a few of the changes, as we will use the Result Monad in the next section.</p>
 <p>The Result Monad uses slightly different names; a value is Ok if it is a successful computation, and it is an Error if the computation has failed. The functions that check this status are <code>self.is_ok()</code> and <code>self.is_error()</code>. <code>self.is_ok()</code> returns <code>True</code> if there is a value, and <code>False</code> if there is an error message. <code>self.is_error()</code> does the opposite.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">class</span> Result:
@@ -377,14 +373,13 @@ result <span class="op">=</span> <span class="bu">int</span>(temp2)</code></pre>
         <span class="va">self</span>._message <span class="op">=</span> message
         <span class="va">self</span>._value <span class="op">=</span> value</code></pre></div>
 <p>Our <code>__init__</code> function now takes an additional argument; an error message. Now, we have a value that indicates whether or not our computation has failed, a value that stores the result of the computation (if the computation succeeded), and a value that stores the error message (if the computation failed).</p>
-<p>In order to access the error message, we add a new function like <code>unwrap</code> from the Option Monad.</p>
+<p>In order to access the error message, we add a new function like <code>unwrap</code> from the Option Monad. <code>unwrap</code> still exists and behaves in about the same way.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="kw">def</span> error_msg(<span class="va">self</span>):
         <span class="cf">if</span> <span class="va">self</span>.is_error():
             <span class="cf">return</span> <span class="va">self</span>._message
         <span class="cf">else</span>:
             <span class="cf">raise</span> <span class="pp">Exception</span>(<span class="st">&#39;This Result is Ok&#39;</span>)</code></pre></div>
 <p>This function checks whether or not we have failed, and returns the error message if it is an Error. Just like <code>unwrap</code>, it throws an Exception if there is no error message.</p>
-<div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"></code></pre></div>
 <p><code>bind</code> and <code>fmap</code> have not changed at all, but it is nice to note that when you return <code>self</code> in the case of the error, the error message stays the same. This means that when we chain multiple <code>bind</code> and <code>fmap</code> calls together, the first one that fails will have its error message propagate through till the end.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">    <span class="co"># function operates on the value in the monad</span>
     <span class="kw">def</span> fmap(<span class="va">self</span>, function):
@@ -433,22 +428,23 @@ result <span class="op">=</span> <span class="bu">int</span>(temp2)</code></pre>
     <span class="at">@classmethod</span>
     <span class="kw">def</span> error(cls, msg):
         <span class="cf">return</span> cls(<span class="va">True</span>, <span class="va">None</span>, msg)</code></pre></div>
-<h1 id="a-parsing-monad"><span class="header-section-number">4</span> A Parsing Monad</h1>
+<h1 id="a-parsing-monad"><span class="header-section-number">3</span> A Parsing Monad</h1>
 <p>We're now going to talk about a Monad called the Parsing Combinator, which basically recreates and improves upon regular expressions, using Monads. Here we see the truth of the oft said but little understood aphorism that Monads represent computation; here, they represent the computation of regular expressions.</p>
 <p>It's also worth noting that there are many python Parsing Combinator libraries on the python package index, and those will have faster, more powerful implementations than the one below.</p>
-<h2 id="why"><span class="header-section-number">4.1</span> Why?</h2>
+<h2 id="why"><span class="header-section-number">3.1</span> Why?</h2>
 <p>The Parsing Combinator is going to seem a little pointless until we get to the examples, so I'd like to try and motivate it a bit. Parsing Combinators are, on the surface, similar to regular expressions, but they are more powerful in a few important ways.</p>
 <p>First of all, while basic regular expressions can only handle regular languages, Parsing Combinators can match context sensitive languages. However, this is rarely important in practice, because most &quot;regular expressions&quot; in modern languages are likewise extended to be able to parse more complex languages.</p>
 <p>Secondly, Parsing Combinators are more readable than regular expressions. Although regular expressions excel at concise and quick patterns, they can quickly become hard to read, like the following regular expression for floating point numbers: <code>[-+]? [0-9]* \.? [0-9]+ ([eE] [-+]? [0-9]+)?</code>. While this is concise and accurate, it is nevertheless hard to read, and impossible to understand if you don't already know regular expressions. And the example above is fairly simple.</p>
 <p>Thirdly, Parsing Combinators allow for more than simple matching and finding substrings. Parsing Combinators allow you to transform the result of a match without leaving the Parsing Combinator; for instance, we could write a Parsing Combinator that found IP addresses in a text file, and then resolved the IP addresses into domain names, and then returned a list of the domain names, instead of simply returning the strings that matched.</p>
 <p>Fourthly, Parsing Combinators can take advantage of compile time type checking in typed languages. While this isn't possible in Python, it is in many other languages. For example, the regular expression <code>[</code> is invalid; but most statically typed languages can't determine that it is invalid until runtime. Parsing Combinators, on the other hand, don't throw runtime exceptions like that; the information they encode is within the language itself, and therefore, they are checked at compile time to be valid.</p>
 <p>Fifthly, they can be really fast. It's rare that a high level, very abstract language can claim to be as fast as low level languages, but there are cases when parsers written with the Parser Combinator Monad can rival or even beat the speed of parsers written in custom C. Obviously, the one I wrote for this next section is optimized for readability and not speed, but the interface is basically the same.</p>
-<h2 id="the-code"><span class="header-section-number">4.2</span> The Code</h2>
+<h2 id="the-code"><span class="header-section-number">3.2</span> The Code</h2>
 <p>Unlike the Option Monad, I'm not going to go over the entire codebase for the Parsing Combinator. I hope to provide enough context so that the inner workings aren't mysterious, but there is a lot of code (all in the appendix) and it is frankly quite dull at times.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="kw">class</span> Parser:
     <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, function):
         <span class="co"># function takes a string to be parsed and returns a Result Monad</span>
-        <span class="co"># holding a tuple, holding (already_parsed_value, remainder_of_string) # or an Error</span>
+        <span class="co"># holding a tuple, holding (already_parsed_value, remainder_of_string)</span>
+        <span class="co"># or an Error</span>
         <span class="va">self</span>._function <span class="op">=</span> function
         
     <span class="kw">def</span> <span class="fu">__call__</span>(<span class="va">self</span>, text):
@@ -709,7 +705,7 @@ match_a.<span class="bu">tuple</span>(match_b)</code></pre></div>
             
         <span class="cf">return</span> <span class="va">self</span>(string).bindr(check_full)</code></pre></div>
 <p>If you want to look at more of the code for context, it is included in the appendices of this paper.</p>
-<h2 id="using-the-parser-combinator"><span class="header-section-number">4.3</span> Using the Parser Combinator</h2>
+<h2 id="using-the-parser-combinator"><span class="header-section-number">3.3</span> Using the Parser Combinator</h2>
 <p>Now we have a powerful enough Parser Monad to recreate all of the flexibility and power of regular expressions. We can combine parsers to make more complex ones, and we can transform the values within parsers, so let's try parsing something simple; let's try and write a Parser Combinator that parses numbers.</p>
 <p>A number can be as simple as <code>12</code> or as complex as <code>12.00123e45</code>, so we're going to need to build up a complex parser. Let's start with creating a parser that parses 1 or more consecutive digits.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">digits <span class="op">=</span> Parser.oneof(<span class="st">&#39;0123456789&#39;</span>).many1()</code></pre></div>
@@ -750,9 +746,9 @@ Parser.parse_total(number, <span class="st">&#39;&#39;</span>)
 
 Parser.parse_total(number, <span class="st">&#39;7.22345e10&#39;</span>) <span class="op">&gt;&gt;</span> result_float
     <span class="co"># Ok(72234500000.0)</span></code></pre></div>
-<h2 id="going-further"><span class="header-section-number">4.4</span> Going Further</h2>
+<h2 id="going-further"><span class="header-section-number">3.4</span> Going Further</h2>
 <p>Everything we've done so far can basically be done in the exact same way by regular expressions. However, because of the way we've defined the Parsing Combinator, we can use <code>bind</code> and <code>fmap</code> inside of Parsing Combinator expressions. This allows us to parse complex expressions into fully formed and entirely arbitrary python objects.</p>
-<h3 id="list-of-numbers-parser"><span class="header-section-number">4.4.1</span> List of Numbers Parser</h3>
+<h3 id="list-of-numbers-parser"><span class="header-section-number">3.4.1</span> List of Numbers Parser</h3>
 <p>Before, we matched a string using our parser, producing a Result Monad. We then used <code>bind</code> to transform the value the Parser returned into an actual number. However, the Parser is also a Monad, so we can move the <code>bind</code> call into the parser itself, and it won't change the way it works.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">number <span class="op">=</span> (sign <span class="op">+</span> digits <span class="op">+</span> decimal <span class="op">+</span> exponent) <span class="op">&gt;&gt;</span> result_float
 
@@ -772,7 +768,7 @@ many_numbers <span class="op">=</span> (
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">text <span class="op">=</span> <span class="st">&#39;2.12345e+100 2.1e10 1223 13.5 100e100&#39;</span>
 <span class="bu">print</span>(Parser.parse_total(many_numbers, text))
 <span class="co"># Ok([2.12345e+100, 21000000000.0, 1223.0, 13.5, 1e+102])</span></code></pre></div>
-<h3 id="csv-parser"><span class="header-section-number">4.4.2</span> CSV Parser</h3>
+<h3 id="csv-parser"><span class="header-section-number">3.4.2</span> CSV Parser</h3>
 <p>Parsing Combinators can be used to write powerful, modular, readable, and concise parsers for any format of text. One common way of representing values in text is the CSV file format; this format is used to represent tables in pure text. The columns are separated by commas, and the rows are separated by newlines. Below is a CSV parser in 5 lines of code.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">expression <span class="op">=</span> Parser.noneof(<span class="st">&#39;,</span><span class="ch">\n</span><span class="st">&#39;</span>).many1()
 comma <span class="op">=</span> Parser.char(<span class="st">&#39;,&#39;</span>)
@@ -797,7 +793,7 @@ text <span class="op">=</span> <span class="st">&#39;&#39;&#39;1,2,3,4,5</span>
 <p>Next, we create simple comma and newline parsers. This isn't really necessary; I just think it makes it easier to read.</p>
 <p>Then, we will define a line parser to be an expression, followed by a comma, over and over. This Parser will match until it comes to a newline, at which point it will stop, because nothing in the Parser can deal with a newline.</p>
 <p>In order to match the whole csv, we will match a line, followed by a newline character, over and over. And then when we pass some data into the CSV, it will parse it into a list of rows, each of which is a list of the values in those rows.</p>
-<h3 id="abstract-syntax-tree-parser"><span class="header-section-number">4.4.3</span> Abstract Syntax Tree Parser</h3>
+<h3 id="abstract-syntax-tree-parser"><span class="header-section-number">3.4.3</span> Abstract Syntax Tree Parser</h3>
 <p>This next section requires a bit of domain knowledge; we're going to parse basic mathematical expressions into something called an Abstract Syntax Tree, or AST. An AST is behind the interpreter or compiler for almost every language, so parsing them is a common thing to want to do. In our case, we are parsing a simple language of addition, subtraction, multiplication, and division, and using parenthesis to let our expression contain a smaller expression.</p>
 <p>The parser that we will construct is going to return a tree like recursive data structure in Python, holding the full structure of the text we pass in. In order to do this recursively, I will not be able to do everything with the constructors and combination functions; instead, I will have to write a new function and pass that explicitly to the default Parser constructor.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python"><span class="im">from</span> enum <span class="im">import</span> Enum, auto
@@ -891,9 +887,9 @@ text <span class="op">=</span> <span class="st">&#39;((1+2) * (9 - 11))&#39;</sp
 <span class="co">#     )</span>
 <span class="co"># )</span></code></pre></div>
 <p>I decided to reproduce this sort of code using standard regular expressions; Not only did my regex version have twice as many lines, it was a much more fragile program. I didn't thoroughly test it, but I didn't even bother adding error checking if stuff went wrong; I just assumed everything would go right. Furthermore, there were nested loops, plenty of functions, and all in all complex, messy, hard to read code. The Parsing Combinator above, however, is short and will always return an Error Result with a sensible error message if an error happens.</p>
-<h1 id="theory-of-monads"><span class="header-section-number">5</span> Theory of Monads</h1>
+<h1 id="theory-of-monads"><span class="header-section-number">4</span> Theory of Monads</h1>
 <p>Now that we've seen a few examples of what a Monad is, we can talk about the formal definition. This is going to be the most abstract section of the text, but I'll try and keep any statements from category theory or abstract algebra from appearing here.</p>
-<h2 id="defining-monads"><span class="header-section-number">5.1</span> Defining Monads</h2>
+<h2 id="defining-monads"><span class="header-section-number">4.1</span> Defining Monads</h2>
 <p>Monads are a special type of object that contains with in it a value and a context. Our Option and Result Monads contained the result of a computation, along with contextual information regarding whether the operation had succeeded or failed. This allowed us to write programs that could detect failure elegantly. Our Parsing Monad contained the result of the parsing so far, as well as the rest of the text remaining to be parsed. Whenever you see a Monad, you can sum up its operation by asking &quot;What is the value in this Monad, and what is the context?&quot;. Many people, when confronted with Monads, want a way to get the value out of the Monad. But this causes problems, because you've taken the value out of context, and it becomes significantly more useless.</p>
 <p>In order to interact with the values without taking them out of their context, we have a function called <code>fmap</code>. <code>fmap</code> takes the value, and applies the function to that value, and puts the result of the function back into context. In our Option and Result Monads, it applied the function to the value if our computation was successful, or it simply bypassed the function if our computation had failed. In our parsing combinator, it applied the function to the result of our computation, while leaving the remainder of the text to be parsed alone.</p>
 <p>However, this meant that we couldn't use functions on the values in our Monad if the functions themselves returned Monads. For our Option and Result Monads, that means that we couldn't use a function that could fail (a function that returned an Option or Result Monad) on our Monad with <code>fmap</code>. If we did that, we could end up with a recursive Monad, like <code>Some(None)</code> or <code>Some(Some(3))</code>. This is annoying, and there's two ways to fix this weirdness.</p>
@@ -913,7 +909,7 @@ Option.none().join() <span class="op">==</span> Option.none()</code></pre></div>
 <span class="kw">def</span> join(monad):
     monad.bind(<span class="kw">lambda</span> x: x.unwrap() <span class="cf">if</span> x.is_some() <span class="cf">else</span> x)</code></pre></div>
 <p>This means, for our purposes, for something to be a Monad, we require it to either have both <code>fmap</code> <em>and</em> <code>join</code>, or just <code>bind</code>. However, it is common for Monads to have all three available.</p>
-<h2 id="monad-laws"><span class="header-section-number">5.2</span> Monad Laws</h2>
+<h2 id="monad-laws"><span class="header-section-number">4.2</span> Monad Laws</h2>
 <p>Now, Monads have three laws, or rules, they have to follow; this is just to make sure Monads don't have any unexpected behavior, but we should go over those rules anyway.</p>
 <p>First of all, if you <code>fmap</code> over a Monad with the identity function (a function that returns its inputs unchanged), the value in the Monad doesn't change.</p>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">Monad(x).fmap(<span class="kw">lambda</span> x: x) <span class="op">==</span> Monad(x)</code></pre></div>
@@ -923,8 +919,8 @@ Option.none().join() <span class="op">==</span> Option.none()</code></pre></div>
 <div class="sourceCode"><pre class="sourceCode python"><code class="sourceCode python">Monad(x).fmap(f) <span class="op">==</span> Monad(f(x))</code></pre></div>
 <p>If you want, you can put these rules into equivalent forms using <code>bind</code> instead of <code>fmap</code>.</p>
 <p>These might seem common sense, and if they are, that's good! The only reason that we require that these rules are followed is so that somebody doesn't create a Monad that behaves weirdly and it screws up our program. They basically boil down to &quot;Monads should behave sensibly when you fmap or bind functions over them&quot;.</p>
-<h1 id="more-monad-examples"><span class="header-section-number">6</span> More Monad Examples</h1>
-<h2 id="the-zeroth-monad"><span class="header-section-number">6.1</span> The Zeroth Monad</h2>
+<h1 id="more-monad-examples"><span class="header-section-number">5</span> More Monad Examples</h1>
+<h2 id="the-zeroth-monad"><span class="header-section-number">5.1</span> The Zeroth Monad</h2>
 <p>Our first section was titled 'Our First Monad'. However, we are computer scientists, and therefore we start counting at zero, not at one. So let's talk about another Monad that everyone reading this document has probably used, but never noticed that it was a Monad.</p>
 <p>Lists.</p>
 <p>How is a list a Monad? Well, from the previous section, a Monad is really just anything with a <code>bind</code> function, or with a <code>fmap</code> and a <code>join</code> function. And while not every programming language has these functions built in, we can easily write these functions for a list.</p>
@@ -986,7 +982,7 @@ bind(
 )
 <span class="co"># [0.0, 1.0, -1.0, 1.4142135623730951, -1.4142135623730951]</span></code></pre></div>
 <p>In this case, we execute two functions in series, getting all of the valid results to our question in one list; but the number of results isn't the same for all inputs, so we need a Monad to represent this computational uncertainty.</p>
-<h2 id="promises-in-javascript"><span class="header-section-number">6.2</span> Promises (in Javascript)</h2>
+<h2 id="promises-in-javascript"><span class="header-section-number">5.2</span> Promises (in Javascript)</h2>
 <p>As I was writing this essay, I started working on a project in Javascript that ended up using a thing called Promises. In Javascript, it's common to call a function that will perform some action, wait for something else to respond to the action, and then respond to that response. This is traditionally done with callbacks: passing a function into another function.</p>
 <div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span class="co">// setTimeout waits for 3000 ms, and then</span>
 <span class="co">// calls the function you passed it.</span>
@@ -1008,6 +1004,7 @@ bind(
       <span class="cf">if</span> (err) <span class="op">{</span> <span class="va">console</span>.<span class="at">log</span>(<span class="st">&#39;Error:&#39;</span><span class="op">,</span> err)<span class="op">;</span> <span class="cf">return</span> <span class="op">}</span>
       <span class="co">// serviceCall takes a function</span>
       <span class="at">serviceCall</span>(dbResults<span class="op">,</span> (err<span class="op">,</span> serviceResults) <span class="op">=&gt;</span> <span class="op">{</span>
+        <span class="cf">if</span> (err) <span class="op">{</span> <span class="va">console</span>.<span class="at">log</span>(<span class="st">&#39;Error:&#39;</span><span class="op">,</span> err)<span class="op">;</span> <span class="cf">return</span> <span class="op">}</span>
         <span class="co">//do something here!</span>
       <span class="op">}</span>)
     <span class="op">}</span>)
@@ -1025,6 +1022,8 @@ bind(
   <span class="op">}</span>)
 <span class="op">}</span></code></pre></div>
 <p>Look familiar? That's right; Promises are essentially Result Monads with <code>bind</code> renamed as <code>then</code>, <code>recover</code> renamed as <code>catch</code>, and with a different underlying implementation (one that makes it impossible to define a <code>unwrap</code> operation, but then again, it's rare to actually need that). This is intentional. The people who designed Promises knew what Monads are, and knew how they could be used to fix a problem with Javascript.</p>
+<h1 id="conclusion"><span class="header-section-number">6</span> Conclusion</h1>
+<p>HELP!</p>
 
 <p></p>
 <h1 id="code-the-result-monad"><span class="header-section-number">7</span> Code: The Result Monad</h1>

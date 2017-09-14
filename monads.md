@@ -94,8 +94,8 @@ else:
 ### Combining The Above
 
 ```python
-def divide_elements(ls, i1, i2):
-    return ls[i1]/ls[i2]
+def inverse_element(ls, i):
+    return 1/ls[i]
 ```
 
 Now, we have combined the two operations in python which might lead to an exception, and we have done it in a way that allows for three different operations to result in an exception. We can rewrite this function so that it will not throw any errors by checking after each step for an error code.
@@ -111,16 +111,12 @@ def division(x, y):
         return None
     return x / y
 
-def divide_elements(ls, i1, i2):
-    failure, v1 = index(ls, i1)
+def inverse_element(ls, i):
+    failure, value = index(ls, i)
     if failure:
         return None
     
-    failure, v2 = index(ls, i2)
-    if failure:
-        return None
-    
-    return division(v1, v2)
+    return division(1, value)
 ```
 
 This code works nicely; you can throw two types of errors at it, and it returns `None` when either occurs.
@@ -130,9 +126,9 @@ This code works nicely; you can throw two types of errors at it, and it returns 
 Python has been very nice to us so far. In Python, it is easy to write a function that returns two values, or returns different types in different scenarios. Python also has other features, such as Exceptions, which make this rewriting we've been doing sort of useless. The most Pythonic way of writing the above would probably be to catch the exceptions:
 
 ```python
-def divide_elements(ls, i1, i2):
+def inverse_element(ls, i):
     try:
-        return ls[i1]/ls[i2]
+        return 1/ls[i]
     except (IndexError, ZeroDivisionError):
         return None
 ```
@@ -244,16 +240,12 @@ def index(ls, i):
         return Option.none()
     return Option.some(ls[i])
 
-def divide_elements(ls, i1, i2):
-    res1 = index(ls, i1)
-    if res1.is_none():
+def inverse_element(ls, i):
+    res = index(ls, i)
+    if res.is_none():
         return Option.none()
     
-    res2 = index(ls, i2)
-    if res2.is_none():
-        return Option.none()
-    
-    return division(res1.unwrap(), res2.unwrap())
+    return division(1, res1.unwrap())
 ```
 
 The above code is the exact same length in lines; and already has some benefits. First, these functions have a return type that can be determined just be looking at the code, is more useful in statically typed languages than dynamically typed languages (like Python). Second, we do not have to remember the convention for every function. Before, we had to remember that `division` returned `None` for an error, but `index` returned `False, None` for an error. Despite these benefits, the code is still filled with checks for errors and clustered with temporary variables.
@@ -278,10 +270,10 @@ Currently, to operate on a value inside of an Option Monad, we need to manually 
     # fmap returns an Option Monad.
 ```
 
-The fmap function is a higher order function. That means it is a function that takes another function as an argument, and does something with that function. If you look in the end of the previous section, we repeated this piece of code two times:
+The fmap function is a higher order function. That means it is a function that takes another function as an argument, and does something with that function. If you look in the end of the previous section, in order to pass the result of `index` into `division`, we had to use this code as boilerplate; and if we wanted to keep passing our value through more and more functions, we would have to continue repeating this block of code.
 
 ```python
-    res = index(ls, i1)
+    res = index(ls, i)
     if res.is_none():
         return Option.none()
 ```
@@ -303,26 +295,33 @@ At a higher level, `fmap` unwraps the value in our Monad, and passes that value 
 
 However, we can't quite use this function to fix the problem we had earlier. Let's see what happens if we try to use `fmap` in that case:
 
-# AAAH IZAAK USES ROOT BELOW BUT DIVISION ABOVE
-
 ```python
-import math
-
-def root(x):
-    if x < 0:
+def division(x, y):
+    if y == 0:
         return Option.none()
-    return Option.some(math.sqrt(x))
+    return Option.some(x / y)
 
 def index(ls, i):
     if i < 0 or i >= len(ls):
         return Option.none()
     return Option.some(ls[i])
 
-def root_element(ls, i):
-    return index(ls, i).fmap(root)
+def inverse_element(ls, i):
+    res = index(ls, i)
+    return res.fmap(lambda x: division(1,x))
 ```
 
-This looks a lot nicer, but it doesn't quite work. We no longer have to do any manual unwrapping, but if we run this, we get a weird result:
+Aside: In Python, you can create a simple one-line function by writing `lambda` followed by the list of arguments, then a colon, and then an expression which will be returned by the function.
+
+```python
+add = lambda x, y: x + y
+add(2,3) #5
+
+add_three = lambda x: 3 + x
+add_three(7) # 10
+```
+
+Our above solution using `fmap` looks a lot nicer, but it doesn't quite work. We no longer have to do any manual unwrapping, but if we run this, we get a weird result:
 
 ```python
 root_element([1,2,3],1)
@@ -330,7 +329,7 @@ root_element([1,2,3],1)
 ```
 
 Instead of having what we want, which is `Some(1.4142135623730951)`, we have our value wrapped in an extra Monadic layer. This is because our `root` function returns a Monad, and `fmap` wraps the result of `root` in a Monad. This is an annoying problem, and we can write a function to flatten it if we want, but instead, we usually write another function; `bind`.
-
+         
 ```python
     # function returns an Option Monad
     def bind(self, function):
@@ -538,7 +537,7 @@ class Result:
 
 Our `__init__` function now takes an additional argument; an error message. Now, we have a value that indicates whether or not our computation has failed, a value that stores the result of the computation (if the computation succeeded), and a value that stores the error message (if the computation failed).
 
-In order to access the error message, we add a new function like `unwrap` from the Option Monad.
+In order to access the error message, we add a new function like `unwrap` from the Option Monad. `unwrap` still exists and behaves in about the same way.
 
 ```python
     def error_msg(self):
@@ -549,10 +548,6 @@ In order to access the error message, we add a new function like `unwrap` from t
 ```
 
 This function checks whether or not we have failed, and returns the error message if it is an Error. Just like `unwrap`, it throws an Exception if there is no error message.
-
-```python
-
-```
 
 `bind` and `fmap` have not changed at all, but it is nice to note that when you return `self` in the case of the error, the error message stays the same. This means that when we chain multiple `bind` and `fmap` calls together, the first one that fails will have its error message propagate through till the end.
 
@@ -650,7 +645,8 @@ Unlike the Option Monad, I'm not going to go over the entire codebase for the Pa
 class Parser:
     def __init__(self, function):
         # function takes a string to be parsed and returns a Result Monad
-        # holding a tuple, holding (already_parsed_value, remainder_of_string) # or an Error
+        # holding a tuple, holding (already_parsed_value, remainder_of_string)
+        # or an Error
         self._function = function
         
     def __call__(self, text):
@@ -1334,6 +1330,7 @@ function handler () {
       if (err) { console.log('Error:', err); return }
       // serviceCall takes a function
       serviceCall(dbResults, (err, serviceResults) => {
+        if (err) { console.log('Error:', err); return }
         //do something here!
       })
     })
@@ -1357,6 +1354,10 @@ function handler (done) {
 ```
 
 Look familiar? That's right; Promises are essentially Result Monads with `bind` renamed as `then`, `recover` renamed as `catch`, and with a different underlying implementation (one that makes it impossible to define a `unwrap` operation, but then again, it's rare to actually need that). This is intentional. The people who designed Promises knew what Monads are, and knew how they could be used to fix a problem with Javascript.
+
+# Conclusion
+
+HELP!
 
 \newpage
 \appendix

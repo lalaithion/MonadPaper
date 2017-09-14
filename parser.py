@@ -41,19 +41,27 @@ class Result:
         else:
             raise Exception('This Result is Ok')
             
-    def bind(self, function):
-        if self.is_error():
-            return self
-        
-        val = self.unwrap()
-        return function(val)
-        
+    # function operates on the value in the monad
     def fmap(self, function):
         if self.is_error():
+            # self is a Result Monad
             return self
-            
+        
         val = self.unwrap()
+        # function(val) is a value, so we have to wrap it
         return Result.ok(function(val))
+    # bind returns a Result Monad
+
+    # function returns a Result Monad
+    def bind(self, function):
+        if self.is_error():
+            # self is a Result Monad
+            return self
+        
+        val = self.unwrap()
+        # function(val) is a Result Monad
+        return function(val)
+    # bind returns a Result Monad
     
     def recover(self, function):
         if self.is_error():
@@ -78,6 +86,9 @@ PARSER
 
 class Parser:
     def __init__(self, function):
+        # function takes a string to be parsed and returns a Result Monad
+        # holding a tuple, holding (already_parsed_value, remainder_of_string)
+        # or an Error
         self._function = function
         
     def __call__(self, text):
@@ -87,14 +98,19 @@ class Parser:
     def __repr__(self):
         return '<Parsing Combinator>'
             
+    # function takes a value, and returns a Result monad holding either the
+    # result of that function, or an error message.
     def bind(self, function):
         
-        print(function)
-        
-        def bind_func(result):
-            return function(result[0]).bind(lambda x: Result.ok((x, result[1])))
+        # returned holds a tuple holding
+        # (currently matched value, remainder of source text)
+        def inner_function(returned):
+            match = returned[0]
+            remainder = returned[1]
+            return (function(match)
+                .bind(lambda x: Result.ok((x, remainder))))
 
-        return Parser(lambda text: self(text).bind(bind_func))
+        return Parser(lambda text: self(text).bind(inner_function))
     
     def fmap(self, function):
         return self.bind(lambda x: Result.ok(function(x)))
@@ -210,21 +226,25 @@ class Parser:
         return self.tuple(other)
 
     @classmethod
-    def char(cls, val):
+    def char(cls, char):
 
+        # char is a single character
+        # text is a string
         def match_char(text):
-            print(val, text)
             try:
                 current = text[0]
             except IndexError:
                 return Result.error('End of String encountered, but ' +
-                    '{} is still expected'.format(repr(val)))
+                    '{} is still expected'.format(repr(char)))
             
-            if current == val:
-                return Result.ok((text[0], text[1:]))
+            if current == char:
+                return Result.ok(
+                    (text[0],   # the character matched
+                     text[1:])  # the remainder of the text
+                )
             else:
                 return Result.error('Failed to match character {} at {}'
-                    .format(repr(val), repr(text)))
+                    .format(repr(char), repr(text)))
 
         return Parser(match_char)
 
@@ -240,7 +260,7 @@ class Parser:
     def oneof(cls, charls):
 
         def match_charls(text):
-            print(charls, text)
+            #print(charls, text)
             try:
                 current = text[0]
             except IndexError:
@@ -287,26 +307,6 @@ class Parser:
             
         return self(string) >> check_full
 
-'''
-Writing Code
-'''
-'''
-def result_int(s):
-    try:
-        i = Result.ok(int(s))
-    except Exception:
-        i = Result.error("Failed to parse into an integer")
-    return i
-
-text = 'aaaabcabc_______'
-print(text)
-parser = (Parser.char('a').many() + Parser.char('b') + Parser.char('c'))
-print(parser)
-result = Parser.parse_prefix(parser, text)
-print(result)
-'''
-
-
 def result_float(s):
     try:
         i = Result.ok(float(s))
@@ -331,115 +331,6 @@ decimal = (Parser.char('.') + digits).optional()
 sign = (Parser.char('+') | Parser.char('-')).optional()
 exponent = ((Parser.char('e') | Parser.char('E')) + sign + digits).optional()
 number = (sign + digits + decimal + exponent) >> result_float
-#
-#print(Parser.parse_total(number, '-12'))
-#print(Parser.parse_total(number, '12e10'))
-#print(Parser.parse_total(number, '2.12345e+100'))
-#print(Parser.parse_total(number, 'hello world'))
-#print(Parser.parse_total(number, '99 bottles of beer on the wall'))
-#print(Parser.parse_total(number, ''))
-#
-#def result_float(x):
-#    try:
-#        return Result.ok(float(x))
-#    except Exception:
-#        return Result.error('Failed to cast to a float')
-#
-#whitespace = Parser.oneof(' \n').many1()
-#many_numbers = (
-#        (whitespace.optional() >= number)
-#    ).many_list()
-#
-#text = '2.12345e+100 2.1e10 1223 13.5 100e100'
-#print(Parser.parse_total(many_numbers, text))
-## Ok(([2.12345e+100, 21000000000.0, 1223.0, 13.5, 1e+102], ''))
-#
-#expression = Parser.noneof(',\n').many1()
-#comma = Parser.char(',')
-#newline = Parser.char('\n')
-#line = (expression <= comma.optional()).many_list()
-#csv = ((line <= newline)).many_list()
-#
-#text = '''1,2,3,8,5
-#hello world, my, good, friends, 5
-#0,1,2,3,4
-#'''
-#print(Parser.parse_total(csv, text))
-#
-#from collections import namedtuple
-#from enum import Enum, auto
-#
-#class Op(Enum):
-#    PLUS = auto()
-#    MINUS = auto()
-#    TIMES = auto()
-#    DIV = auto()
-#
-#Expr = namedtuple('Expr', ['Op','e1','e2'])
-#
-#openp = Parser.char('(') + whitespace.optional()
-#closep = whitespace.optional() + Parser.char(')')
-#plus = whitespace.optional() + Parser.char('+') + whitespace.optional()
-#minus = whitespace.optional() + Parser.char('-') + whitespace.optional()
-#times = whitespace.optional() + Parser.char('*') + whitespace.optional()
-#div = whitespace.optional() + Parser.char('/') + whitespace.optional()
-#
-#Plus = lambda x: Expr(Op.PLUS, x[0], x[1])
-#Minus = lambda x: Expr(Op.MINUS, x[0], x[1])
-#Times = lambda x: Expr(Op.TIMES, x[0], x[1])
-#Div = lambda x: Expr(Op.DIV, x[0], x[1])
-#
-#def expr(text):
-#    recursive_plus = ((openp >= Parser(expr)) & (plus >= Parser(expr))) <= closep
-#    recursive_minus = ((openp >= Parser(expr)) & (minus >= Parser(expr))) <= closep
-#    recursive_times = ((openp >= Parser(expr)) & (times >= Parser(expr))) <= closep
-#    recursive_div = ((openp >= Parser(expr)) & (div >= Parser(expr))) <= closep
-#
-#    full = (
-#                (recursive_plus > Plus)
-#                | (recursive_minus > Minus)
-#                | (recursive_times > Times)
-#                | (recursive_div > Div)
-#                | number
-#           )
-#
-#    return full(text)
-#
-#text = '((1+2) * (9 - 11))'
-#
-#print(Parser(expr).parse_total(text))
-## Ok(
-##     Expr(
-##         Op=<Op.TIMES: 3>,
-##         e1=Expr(
-##             Op=<Op.PLUS: 1>,
-##             e1=1.0,
-##             e2=2.0
-##         ),
-##         e2=Expr(
-##             Op=<Op.MINUS: 2>,
-##             e1=9.0,
-##             e2=11.0
-##         )
-##     )
-## )
-## Here is a function that matches any character
-#
-#def any_char(text):
-#    if len(text) == 0:
-#        return Result.error("The text is too short"
-#                            " to contain any character")
-#    else:
-#        return Result.ok((text[0], text[1:]))
-#
-#any_char_parser = Parser(any_char).fmap(ord)
-#
-#print(any_char_parser('hello'))
-#print(any_char_parser('hello'))
-## Result.Ok(('h','ello'))
-#
-#
-
 
 from enum import Enum, auto
 
@@ -516,21 +407,5 @@ def expr(text):
     return full(text)
 
 text = '((1+2) * (9 - 11))'
-#
 
-#print(Parser(expr).parse_total(text))
-
-loop = Parser.char('hi').optional().optional()
-
-#print(loop("hi"))
-
-def bad_recursion(text):
-    
-    bad = Parser(bad_recursion)
-    final = bad + Parser.char('a')
-    
-    return final(text)
-
-bad_parser = Parser(bad_recursion)
-
-print(bad_parser('a'))
+print(Parser(expr).parse_total(text))
