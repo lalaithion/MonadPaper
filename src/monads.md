@@ -22,7 +22,7 @@ In contrast, several other explanations range from useless to wrong.
 
  - Monads are monoids in the category of endofunctors
  - Monads are the the totality of all beings
- 
+
 The first definition is correct, and if you already know what a monoid, a category, and an endofunctor is, congratulations! You probably are working on, or have, your PhD, and you can use that definition to help inform the rest of this essay. If you have no idea what those words mean, don't worry about trying to interpret them. They're mathy words to describe what we're going to talk about later in more plain terms.
 
 The second definition is wrong. It refers to a completely different concept in philosophy and theology that happens to have the same name. Ignore it.
@@ -30,7 +30,7 @@ The second definition is wrong. It refers to a completely different concept in p
 Finally, we have definitions that are absurd:
 
  - Monads are like burritos
- 
+
 I have seen people make fun of this definition a lot, but I've never seen it actually used. However, I doubt that it will be useful to anyone who doesn't know what Monads are.
 
 Finally, I want to remark upon how varied and different Monads truly are; This essay intends to introduce a few common monads, and provide a framework for thinking about them, but you will still come across Monads which are foreign to you. By an analogy; consider this paper an introduction to music, where I talk about classical music, jazz, and rock and roll. That barely covers many genres of music; a reader of that paper would be confounded upon hearing rap for the first time.
@@ -41,7 +41,7 @@ In this section, we will explore the common problem of how to report errors to t
 
 ## Error Handling in Plain Python
 
-Python usually uses Exception raising and catching to report errors that happen during execution. It is a desirable feature to have in a scripting language, but it is less useful in systems languages like C, Go, or Rust, because exceptions are expensive in terms of memory and CPU time. It's also less useful in functional languages like Haskell or Scala, which use types and abstract data structures to make code more predictable and safer, a goal which is undermined when code can throw exceptions that crash the whole program. In the following section, I'll be exploring ways to handle errors in Python without throwing exceptions and without using Monads.
+Python usually uses Exception throwing and catching to report errors that happen during execution. It is a desirable feature to have in a scripting language, but it is less useful in systems languages like C, Go, or Rust, because exceptions are expensive in terms of memory and CPU time. It's also less useful in functional languages like Haskell or Scala, which use types and abstract data structures to make code more predictable and safer, a goal which is undermined when code can throw exceptions that crash the whole program. In the following section, I'll be exploring ways to handle errors in Python without throwing exceptions and without using Monads.
 
 ### Division
 
@@ -77,15 +77,15 @@ Our first guess might be to have our error code be the same as above, and just r
 ```python
 def index(ls, i):
     if i < 0 or i >= len(ls):
-        return False, None
-    return True, ls[i]
+        return True, None
+    return False, ls[i]
 ```
 
 This allows us to actually check whether or not this function has failed, without worrying about receiving an exception. This allows us to handle errors from outside of the function in a logical way:
 
 ```python
-ok, value = index([1,2,3],0)
-if not ok:
+err, value = index([1,2,3],0)
+if err:
     print("Oh no, we failed")
 else:
     print(value)
@@ -112,10 +112,10 @@ def division(x, y):
     return x / y
 
 def inverse_element(ls, i):
-    failure, value = index(ls, i)
-    if failure:
+    err, value = index(ls, i)
+    if err:
         return None
-    
+
     return division(1, value)
 ```
 
@@ -154,7 +154,7 @@ class Option:
             return 'Nothing'
         else:
             return 'Some({})'.format(self._value)
-            
+
     def is_some(self):
         if self._failed:
             return False
@@ -168,11 +168,11 @@ class Option:
             raise Exception('This Option has no value')
         else:
             return self._value
-    
+
     @classmethod
     def some(cls, x):
         return cls(False, x)
-    
+
     @classmethod
     def none(cls):
         return cls(True, None)
@@ -185,7 +185,7 @@ class Option:
     def __init__(self, failed, value):
         self._failed = failed
         self._value = value
-    
+
     def __repr__(self):
         if self._failed:
             return 'Nothing'
@@ -202,7 +202,7 @@ The `__repr__` function simply tells python how this object should be printed.
         if self._failed:
             return False
         return True
-        
+
     def is_none(self):
         return not self.is_some()
 
@@ -219,7 +219,7 @@ These three functions are the meat of the Option Monad; these are the ways we in
     @classmethod
     def some(cls, x):
         return cls(False, x)
-    
+
     @classmethod
     def none(cls):
         return cls(True, None)
@@ -244,7 +244,7 @@ def inverse_element(ls, i):
     res = index(ls, i)
     if res.is_none():
         return Option.none()
-    
+
     return division(1, res1.unwrap())
 ```
 
@@ -329,14 +329,14 @@ root_element([1,2,3],1)
 ```
 
 Instead of having what we want, which is `Some(1.4142135623730951)`, we have our value wrapped in an extra Monadic layer. This is because our `root` function returns a Monad, and `fmap` wraps the result of `root` in a Monad. This is an annoying problem, and we can write a function to flatten it if we want, but instead, we usually write another function; `bind`.
-         
+
 ```python
     # function returns an Option Monad
     def bind(self, function):
         if self.is_none():
             # self is an Option Monad
             return self
-        
+
         val = self.unwrap()
         # function returns an Option Monad
         return function(val)
@@ -405,7 +405,7 @@ def option_get_group(match, group):
         g = Option.none()
     else:
         g = Option.some(g)
-    
+
     return g
 
 def option_int(s):
@@ -528,7 +528,7 @@ The Result Monad uses slightly different names; a value is Ok if it is a success
 
 ```python
 class Result:
-    
+
     def __init__(self, failed, value, message):
         self._failed = failed
         self._message = message
@@ -549,7 +549,7 @@ In order to access the error message, we add a new function like `unwrap` from t
 
 This function checks whether or not we have failed, and returns the error message if it is an Error. Just like `unwrap`, it throws an Exception if there is no error message.
 
-`bind` and `fmap` have not changed at all, but it is nice to note that when you return `self` in the case of the error, the error message stays the same. This means that when we chain multiple `bind` and `fmap` calls together, the first one that fails will have its error message propagate through till the end.
+`bind` and `fmap` have not changed at all, but it is nice to note that when you return `self` in the case of the error, the error message stays the same. This means that when we chain multiple `bind` and `fmap` calls together, the first one that fails will have its error message propagate through untill the end.
 
 ```python
     # function operates on the value in the monad
@@ -557,7 +557,7 @@ This function checks whether or not we have failed, and returns the error messag
         if self.is_error():
             # self is a Result Monad
             return self
-        
+
         val = self.unwrap()
         # function(val) is a value, so we have to wrap it
         return Result.ok(function(val))
@@ -568,7 +568,7 @@ This function checks whether or not we have failed, and returns the error messag
         if self.is_error():
             # self is a Result Monad
             return self
-        
+
         val = self.unwrap()
         # function(val) is a Result Monad
         return function(val)
@@ -581,7 +581,7 @@ I'm also adding another function that is sort of like `bind`, but instead, provi
     def recover(self, function):
         if self.is_error():
             return function()
-        
+
         return self
 ```
 
@@ -611,7 +611,7 @@ We've already seen the following constructors used above, but for completeness h
     @classmethod
     def ok(cls, val):
         return cls(False, val, None)
-    
+
     @classmethod
     def error(cls, msg):
         return cls(True, None, msg)
@@ -648,7 +648,7 @@ class Parser:
         # holding a tuple, holding (already_parsed_value, remainder_of_string)
         # or an Error
         self._function = function
-        
+
     def __call__(self, text):
         return self._function(text)
 ```
@@ -697,7 +697,7 @@ def match_char(char, text):
     except IndexError:
         return Result.error('End of String encountered, but ' +
             '{} is still expected'.format(repr(char)))
-    
+
     if current == char:
         return Result.ok(
             (text[0],   # the character matched
@@ -731,7 +731,7 @@ However, it's very hard to read for the first time if all the binds look the sam
     # function takes a value, and returns a Result monad holding either the
     # result of that function, or an error message.
     def bindp(self, function):
-        
+
         # returned holds a tuple holding
         # (currently matched value, remainder of source text)
         def inner_function(returned):
@@ -800,18 +800,18 @@ Now that we've seen a way to construct this Monad, and how its `bind` and `fmap`
     # other is a parser
     # function takes two values, and returns a new value
     def combine(self, other, function):
-        
+
         def combine_func(returned):
             match = returned[0] # the matched value from self
             rest = returned[1] # the remaining text from self
             res = other(rest) # pass the remaining text through other
-            
+
             # I could rewrite this using bind, but it
             # just results in harder to read code, which is what
             # we are trying to avoid.
             if res.is_ok():
                 other_match, other_rest = res.unwrap()
-                
+
                 # we use function to combine the two matches into
                 # a new match, and then we put the new match back into
                 # context with the remaining text.
@@ -819,7 +819,7 @@ Now that we've seen a way to construct this Monad, and how its `bind` and `fmap`
                 return Result.ok((new_match, other_rest))
             else:
                 return res
-            
+
         return (
               Parser(lambda text: self(text)
                 .bindr( lambda res: combine_func(res) )
@@ -836,13 +836,13 @@ Once we have `combine` defined, we're going to create a bunch of other similar f
         # think string concatenation for this plus, not
         # addition of numbers.
         return self.combine(other, lambda x,y: x + y)
-        
+
     def first(self, other):
         return self.combine(other, lambda x,y: x)
-    
+
     def last(self, other):
         return self.combine(other, lambda x,y: y)
-    
+
     def tuple(self, other):
         return self.combine(other, lambda x,y: (x,y))
 ```
@@ -904,7 +904,7 @@ In order to use a parser, all we have to do is call it on some input. However, t
 
 ```python
     def parse_total(self, string):
-        
+
         def check_full(tup):
             # if there is no remaining text, return our matched value
             if tup[1] == '':
@@ -913,7 +913,7 @@ In order to use a parser, all we have to do is call it on some input. However, t
             else:
                 return Result.error('The match did not consist of the entire ' +
                     'string: {} was left over'.format(repr(tup[1])))
-            
+
         return self(string).bindr(check_full)
 ```
 
@@ -1073,7 +1073,7 @@ class Expr:
     def __init__(expr1, op, expr2):
         self.expr1 = expr1
         self.expr2 = expr2
-        
+
         if op == '+':
             self.op = Op.PLUS
         elif op == '-':
@@ -1084,7 +1084,7 @@ class Expr:
             self.op = Op.DIV
         else:
             self.op = op
-    
+
     def __repr__(self):
         return ("Expr({}, {}, {})"
             .format(self.expr1, self.op, self.expr2))
@@ -1110,14 +1110,14 @@ def surround(parser):
 
 def expr(text):
     recursive = Parser(expr)
-    
+
     expression = surround(
         (recursive | number)
         & operator
         & (recursive | number)
     )
-    
-    # things parsed by expression will have the slightly ugly form
+
+    # values parsed by `expression` will have the slightly ugly form
     # of Ok(((a,b),c)). To transform that into an Ok(Expr)
     # we will define the following function:
     weird_func = lambda weird_tuple: Expr(
@@ -1125,11 +1125,11 @@ def expr(text):
                         weird_tuple[0][1],
                         weird_tuple[1]
                     )
-    
+
     # we use fmap to apply the above function to
     # the matched value of the parser
     full = expression > weird_func
-    
+
     return full(text)
 
 text = '((1+2) * (9 - 11))'
@@ -1282,7 +1282,7 @@ def sqrts(x):
         return [0.0]
     else:
         return [sqrt(x), -sqrt(x)]
-        
+
 sqrts(4) # [-2, 2]
 sqrts(-4) # []
 
@@ -1390,46 +1390,46 @@ class Result:
 
     def is_error(self):
         return not self.is_ok()
-    
+
     def unwrap(self):
         if self.is_ok():
             return self._value
         else:
             raise Exception('This Result is an Error')
-    
+
     def error_msg(self):
         if self.is_error():
             return self._message
         else:
             raise Exception('This Result is Ok')
-            
+
     def bind(self, function):
         if self.is_error():
             return self
-        
+
         val = self.unwrap()
         return function(val)
-        
+
     def fmap(self, function):
         if self.is_error():
             return self
-        
+
         val = self.unwrap()
         return Result.ok(function(val))
-    
+
     def recover(self, function):
         if self.is_error():
             return function()
-        
+
         return self
-    
+
     def __rshift__(self, function):
         return self.bind(function)
 
     @classmethod
     def ok(cls, val):
         return cls(False, val, None)
-    
+
     @classmethod
     def error(cls, msg):
         return cls(True, None, msg)
@@ -1471,7 +1471,7 @@ def result_get_group(match, group):
         g = Result.error("Failed to get the group from the match")
     else:
         g = Result.ok(g)
-        
+
     return g
 
 def result_int(s):
@@ -1500,26 +1500,26 @@ print(result)
 class Parser:
     def __init__(self, function):
         self._function = function
-        
+
     def __call__(self, text):
         x = self._function(text)
         return x
 
     def __repr__(self):
         return '<Parsing Combinator>'
-            
+
     def bind(self, function):
-        
+
         def bind_func(result):
             return function(result[0]).bind(lambda x: Result.ok((x, result[1])))
 
         return Parser(lambda text: self(text).bind(bind_func))
-    
+
     def fmap(self, function):
         return self.bind(lambda x: Result.ok(function(x)))
-    
+
     def combine(self, other, function):
-        
+
         def combine_func(match, rest):
             res = other(rest)
             if res.is_ok():
@@ -1528,96 +1528,96 @@ class Parser:
                 return Result.ok((new_match, rest))
             else:
                 return res
-            
+
         return Parser(lambda text: self(text).bind(lambda res: combine_func(*res)))
-    
+
     def concat(self, other):
         return self.combine(other, lambda x, y: x + y)
-    
+
     def choice(self,other):
-        
+
         def choice_func(text):
             return self(text).recover(lambda: other(text))
-        
+
         return Parser(choice_func)
-    
+
     def many(self, function=lambda x,y: x + y):
-        
+
         def repeat_func(text):
             res = self(text)
-            
+
             if res.is_error():
                 return Result.ok(('',text))
-            
+
             match = res.unwrap()[0]
             rest = res.unwrap()[1]
-            
+
             res = self(rest)
-            
+
             while res.is_ok():
                 match = function(match, res.unwrap()[0])
                 rest = res.unwrap()[1]
                 res = self(rest)
-            
+
             return Result.ok((match, rest))
-            
+
         return Parser(repeat_func)
-    
+
     def many_list(self):
-        
+
         def repeat_func(text):
             res = self(text)
-            
+
             if res.is_error():
                 return Result.ok(('',text))
-            
+
             match = [res.unwrap()[0]]
             rest = res.unwrap()[1]
-            
+
             res = self(rest)
-            
+
             while res.is_ok():
                 match = match + [res.unwrap()[0]]
                 rest = res.unwrap()[1]
                 res = self(rest)
-            
+
             return Result.ok((match, rest))
-            
+
         return Parser(repeat_func)
-        
+
     def many1(self, function=lambda x,y: x + y):
         return self.combine(self.many(function), function)
-    
+
     def many1_list(self):
         return self.combine(self.many_list(function), function)
-    
+
     def optional(self):
         return self | Parser.empty()
-    
+
     def first(self, other):
         return self.combine(other, lambda x,y: x)
-    
+
     def last(self, other):
         return self.combine(other, lambda x,y: y)
-    
+
     def tuple(self, other):
         return self.combine(other, lambda x,y: (x,y))
 
     def __rshift__(self, function):
         return self.bind(function)
-    
+
     def __gt__(self, function):
         return self.fmap(function)
-    
+
     def __ge__(self, other):
         return self.last(other)
-    
+
     def __le__(self, other):
         return self.first(other)
-        
+
     def __add__(self, other):
         return self.concat(other)
-        
+
     def __or__(self, other):
         return self.choice(other)
 
@@ -1633,7 +1633,7 @@ class Parser:
             except IndexError:
                 return Result.error('End of String encountered, but ' +
                     '{} is still expected'.format(repr(val)))
-            
+
             if current == val:
                 return Result.ok((text[0], text[1:]))
             else:
@@ -1690,13 +1690,13 @@ class Parser:
         return self(string)
 
     def parse_total(self, string):
-        
+
         def check_full(tup):
             if tup[1] == '':
                 return Result.ok(tup[0])
             else:
                 return Result.error('The match did not consist of the entire ' +
                     'string: {} was left over'.format(repr(tup[1])))
-            
+
         return self(string) >> check_full
 ```
